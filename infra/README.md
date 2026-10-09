@@ -36,6 +36,8 @@ Two stacks avoid the first-deployment dependency between creating the ECR reposi
 
 ## Call the deployed API
 
+If Docker ECR login fails with a Windows credential-helper error such as `The stub received bad data`, rerun the same deployment with `-UseTemporaryDockerConfig`. This builds with your normal Docker configuration, then pushes through the same local engine using an isolated configuration containing the temporary ECR token. The credential file is removed in `finally`, including on push failure; your existing Docker credentials are unchanged. The workaround supports local Docker Desktop/Engine sockets. Rerunning with the same stack prefix and table name updates the existing foundation.
+
 To deploy CPU inference alongside Go, push the ML worker image to the foundation ECR repository, then pass `-MLWorkerDigest <sha256:digest> -DefaultModelVersion <version>` to `deploy.ps1`. Alternatively pass `-MLInferenceURL <url>` for a separately hosted worker. The service now uses an explicit Fargate task definition with the required `Main` application container and optional inference sidecar. Models are registered through `/v1/models`; see [the complete ML handoff](../docs/ml-integration.md).
 
 The worker receives the generated secret as `ML_INFERENCE_TOKEN`, and the task role has read access to `models/` and `model-artifacts/`. This does not grant model upload permissions or create a training job. The inference worker's loopback port is not exposed publicly; a remote worker must authenticate the same generated secret.

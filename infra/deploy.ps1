@@ -9,6 +9,7 @@ param(
     [string]$CorsOrigins = '',
     [ValidateRange(1,10)]
     [int]$MaxTasks = 2,
+    [switch]$UseTemporaryDockerConfig,
     [ValidatePattern('^$|^sha256:[a-f0-9]{64}$')]
     [string]$MLWorkerDigest = '',
     [string]$MLInferenceURL = '',
@@ -59,14 +60,49 @@ $tag = 'deploy-' + [DateTime]::UtcNow.ToString('yyyyMMddHHmmss') + '-' + [Guid]:
 $image = "${repository}:$tag"
 
 Write-Host 'Building and pushing the linux/amd64 backend image...'
-# Pass the registry token only through stdin, never as a Docker argument.
-$password = Invoke-Aws -Arguments @('ecr', 'get-login-password')
-try {
-    $password | & docker login --username AWS --password-stdin $registry
-    if ($LASTEXITCODE -ne 0) { throw 'ECR login failed.' }
-} finally { $password = $null }
-Invoke-Docker -Arguments @('build', '--platform', 'linux/amd64', '-t', $image, $backend) | Out-Host
-Invoke-Docker -Arguments @('push', $image) | Out-Host
+if ($UseTemporaryDockerConfig) {
+    # Keep builds on the normal Docker context. Only the ECR push uses temporary
+    # file credentials, bypassing a broken Windows credential helper.
+    $dockerEndpoint = (Invoke-Docker -Arguments @('context', 'inspect', '--format', '{{.Endpoints.docker.Host}}')).Trim()
+    if ($env:DOCKER_HOST -and -not $env:DOCKER_CONTEXT) { $dockerEndpoint = $env:DOCKER_HOST }
+    if ($dockerEndpoint -notmatch '^(npipe|unix)://') {
+        throw 'Temporary Docker authentication requires a local Docker Desktop/Engine socket.'
+    }
+    Invoke-Docker -Arguments @('build', '--platform', 'linux/amd64', '-t', $image, $backend) | Out-Host
+    $temporaryDockerConfig = Join-Path ([IO.Path]::GetTempPath()) ('yieldsense-ecr-' + [Guid]::NewGuid().ToString('N'))
+    $credentialFile = Join-Path $temporaryDockerConfig 'config.json'
+    $previousDockerContext = $env:DOCKER_CONTEXT
+    try {
+        New-Item -ItemType Directory -Path $temporaryDockerConfig | Out-Null
+        $password = (Invoke-Aws -Arguments @('ecr', 'get-login-password')).Trim()
+        $auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('AWS:' + $password))
+        $configuration = @{ auths = @{ $registry = @{ auth = $auth } } } | ConvertTo-Json -Depth 4
+        [IO.File]::WriteAllText($credentialFile, $configuration, [Text.UTF8Encoding]::new($false))
+        $password = $null
+        $auth = $null
+        $configuration = $null
+        # An inherited context would override --host and refer to context files
+        # absent from the temporary directory.
+        $env:DOCKER_CONTEXT = $null
+        Invoke-Docker -Arguments @('--config', $temporaryDockerConfig, '--host', $dockerEndpoint, 'push', $image) | Out-Host
+    } finally {
+        $env:DOCKER_CONTEXT = $previousDockerContext
+        $password = $null
+        $auth = $null
+        $configuration = $null
+        if (Test-Path -LiteralPath $credentialFile) { Remove-Item -LiteralPath $credentialFile -Force }
+        if (Test-Path -LiteralPath $temporaryDockerConfig) { Remove-Item -LiteralPath $temporaryDockerConfig }
+    }
+} else {
+    # Pass the registry token only through stdin, never as a Docker argument.
+    $password = Invoke-Aws -Arguments @('ecr', 'get-login-password')
+    try {
+        $password | & docker login --username AWS --password-stdin $registry
+        if ($LASTEXITCODE -ne 0) { throw 'ECR login failed. If the Docker credential helper failed, rerun with -UseTemporaryDockerConfig.' }
+    } finally { $password = $null }
+    Invoke-Docker -Arguments @('build', '--platform', 'linux/amd64', '-t', $image, $backend) | Out-Host
+    Invoke-Docker -Arguments @('push', $image) | Out-Host
+}
 $digest = (Invoke-Aws -Arguments @('ecr', 'describe-images', '--repository-name', [string]$outputs['RepositoryName'],
     '--image-ids', "imageTag=$tag", '--query', 'imageDetails[0].imageDigest', '--output', 'text')).Trim()
 if ($digest -notmatch '^sha256:[a-f0-9]{64}$') { throw 'Could not resolve the uploaded image digest.' }
