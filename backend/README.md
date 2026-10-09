@@ -103,6 +103,6 @@ go build ./cmd/server
 docker build -t yieldsense-backend .
 ```
 
-Tests exercise robust/expected divergence, joint scenarios, safety/capacity, deadline handling, and 100 seeded comparisons with an independent exhaustive optimizer. HTTP tests cover authentication, intake defaults, version conflicts, body/image validation, immutable simulation and failed report writes. Test doubles exist only in tests. A live AWS/emulator check is still needed for deployment credentials, permissions and networking.
+Tests exercise robust/expected divergence, joint scenarios, safety/capacity, deadline handling, and 100 seeded comparisons with an independent exhaustive optimizer. HTTP tests cover authentication, intake defaults, version conflicts, body/image validation, immutable simulation and failed report writes. Adapter tests exercise real AWS SDK requests against local HTTP fixtures, including DynamoDB conditional writes/pagination and S3 round trips. Test doubles exist only in tests. A live AWS/emulator check is still needed for deployment credentials, permissions and networking. Reports are limited to 8 MiB so every persisted report can be read back.
 
 Official references: [Echo](https://echo.labstack.com/guide/quickstart/), [AWS SDK for Go v2](https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/welcome.html).

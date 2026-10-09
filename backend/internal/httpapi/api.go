@@ -415,6 +415,9 @@ func (a *API) execute(c *echo.Context, in domain.Input, parent string) error {
 	if err != nil {
 		return err
 	}
+	if len(data) > 8*1024*1024 {
+		return echo.NewHTTPError(413, "run report exceeds 8 MiB; reduce input evidence or batch count")
+	}
 	key := "reports/" + run.ID + ".json"
 	requestCtx := c.Request().Context()
 	if err := a.Objects.Put(requestCtx, key, data, "application/json"); err != nil {

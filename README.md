@@ -1,0 +1,7 @@
+# YieldSense
+
+The backend is implemented in **Go with Echo v5**, using **Amazon DynamoDB and S3 only** for runtime persistence. It provides weighed-batch intake, human review, composition scenarios, route management, robust/expected optimization, baselines, shutdown/price simulations, image uploads and immutable JSON audit reports.
+
+See [backend setup and API documentation](backend/README.md), [storage infrastructure](infra/storage.yaml), and the [end-to-end demo](scripts/demo-backend.ps1).
+
+`HLD.md` and `Implementation_Guide.md` contain the original design, including Python/FastAPI, OR-Tools, and SageMaker proposals. For the implemented backend, `backend/README.md` supersedes those stack choices: the optimizer runs in Go and there is no ML inference service. Frontend and ML directories remain placeholders.
