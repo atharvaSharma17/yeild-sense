@@ -1,6 +1,8 @@
 # YieldSense Go backend
 
-Go 1.26.1, Echo v5, AWS SDK v2. Runtime persistence uses **only DynamoDB and S3**. There is no Python process, SQL database, Redis, SageMaker endpoint, or external solver dependency.
+Go 1.26.1, Echo v5, AWS SDK v2. Runtime persistence uses **only DynamoDB and S3**. The public API and optimizer run in Go. Optional CPU image inference uses the supplied PyTorch serving wrapper or a compatible HTTP worker.
+
+See the [ML integration handoff](../docs/ml-integration.md) for registering artifacts, connecting inference and deploying the worker. Training remains the ML developer's responsibility.
 
 ## Setup
 
@@ -42,6 +44,12 @@ JSON endpoints require `Content-Type: application/json`. Lists return `{items, n
 | GET / PUT | `/v1/batches/:id` | Read/replace batch, including human review |
 | POST | `/v1/composition` | Attach `{batch_id, composition}`, using `If-Match` |
 | POST | `/v1/batches/:id/images` | Raw JPEG/PNG body; 10 MiB, 16 megapixels maximum |
+| GET | `/v1/images/:id` | Uploaded image metadata |
+| POST / GET | `/v1/models` | Register/list immutable model manifests |
+| GET | `/v1/models/:id` | Read model version metadata |
+| POST | `/v1/predict-device` | Track B inference with batch/image/model IDs and `If-Match` |
+| POST | `/v1/predict-composition` | Optional Track A inference with `If-Match` |
+| GET | `/v1/predictions/:id` | Immutable prediction and provenance |
 | POST / GET | `/v1/routes` | Create/list processing routes |
 | GET / PUT | `/v1/routes/:id` | Read/replace route |
 | POST | `/v1/optimize` | Load stored records and create audited plan |
@@ -94,7 +102,7 @@ Run reports include the complete inputs, their SHA-256, record versions, solver 
 
 ## Persistence and validation
 
-DynamoDB uses collection partitions `batches`, `routes`, `images`, and `runs`, with server-generated IDs as sort keys. Records hold JSON payloads plus a numeric version. Conditional writes prevent lost updates; collection queries paginate without table scans. Stored records are limited to 300 KiB. The collection-partition layout is suitable for the small single-facility MVP; scale-out would require partition sharding or tenant partitioning.
+DynamoDB uses collection partitions `batches`, `routes`, `images`, `models`, `model_outputs`, and `runs`. Model versions are immutable keys; other records use server-generated IDs. Records hold JSON payloads plus a numeric version. Conditional writes prevent lost updates, and prediction/batch updates use atomic transactions. Collection queries paginate without table scans. Stored records are limited to 300 KiB. The collection-partition layout suits the single-facility MVP; scale-out would require partition sharding or tenant partitioning.
 
 S3 holds validated images at `raw/<batch_id>/<image_id>.*` and immutable run snapshots at `reports/<run_id>.json`. Objects are written before metadata; if the DynamoDB write fails, an unreferenced S3 object can remain. S3 and DynamoDB have no shared transaction. Metadata never points to an object whose write failed. API retries can create duplicate runs/intake records; request idempotency is not implemented.
 

@@ -6,4 +6,4 @@ See [backend setup and API documentation](backend/README.md), [storage infrastru
 
 Deploy the backend and provision storage with `./infra/deploy.ps1 -Region ap-south-1`. See the [infrastructure deployment guide](infra/README.md) for AWS setup, configuration and cleanup.
 
-`HLD.md` and `Implementation_Guide.md` contain the original design, including Python/FastAPI, OR-Tools, and SageMaker proposals. For the implemented backend, `backend/README.md` supersedes those stack choices: the optimizer runs in Go and there is no ML inference service. Frontend and ML directories remain placeholders.
+`HLD.md` and `Implementation_Guide.md` contain the original design, including Python/FastAPI, OR-Tools, and SageMaker proposals. The API and optimizer are implemented in Go. A CPU serving wrapper connects the HLD's PyTorch model through a versioned adapter; see the [ML developer handoff](docs/ml-integration.md). Model training belongs to the ML developer. The frontend remains a placeholder.

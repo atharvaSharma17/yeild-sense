@@ -36,6 +36,10 @@ Two stacks avoid the first-deployment dependency between creating the ECR reposi
 
 ## Call the deployed API
 
+To deploy CPU inference alongside Go, push the ML worker image to the foundation ECR repository, then pass `-MLWorkerDigest <sha256:digest> -DefaultModelVersion <version>` to `deploy.ps1`. Alternatively pass `-MLInferenceURL <url>` for a separately hosted worker. The service now uses an explicit Fargate task definition with the required `Main` application container and optional inference sidecar. Models are registered through `/v1/models`; see [the complete ML handoff](../docs/ml-integration.md).
+
+The worker receives the generated secret as `ML_INFERENCE_TOKEN`, and the task role has read access to `models/` and `model-artifacts/`. This does not grant model upload permissions or create a training job. The inference worker's loopback port is not exposed publicly; a remote worker must authenticate the same generated secret.
+
 Use the profile/region used during deployment. Load the generated key into your current shell without printing it:
 
 ```powershell

@@ -416,10 +416,19 @@ func (a *API) execute(c *echo.Context, in domain.Input, parent string) error {
 		return bad(err.Error())
 	}
 	evidence := []Prediction{}
+	seenEvidence := map[string]bool{}
 	for _, b := range in.Batches {
-		if b.LatestPredictionID != "" {
+		refs := []string{b.LatestPredictionID}
+		if b.Composition != nil && b.Composition.Source == "model" {
+			refs = append(refs, b.Composition.ModelOutputID)
+		}
+		for _, ref := range refs {
+			if ref == "" || seenEvidence[ref] {
+				continue
+			}
+			seenEvidence[ref] = true
 			var p Prediction
-			if err := a.Records.Get(c.Request().Context(), "model_outputs", b.LatestPredictionID, &p); err != nil {
+			if err := a.Records.Get(c.Request().Context(), "model_outputs", ref, &p); err != nil {
 				return err
 			}
 			if p.BatchID != b.ID {

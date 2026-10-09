@@ -43,7 +43,7 @@ type Model struct {
 	DataVersion           string             `json:"data_version"`
 	TrainingJobARN        string             `json:"training_job_arn"`
 	Labels                []string           `json:"labels"`
-	BatteryReviewLabels []string `json:"battery_review_labels,omitempty"`
+	BatteryReviewLabels   []string           `json:"battery_review_labels,omitempty"`
 	Preprocessing         Preprocessing      `json:"preprocessing"`
 	ConfidenceThreshold   float64            `json:"confidence_threshold"`
 	Evaluation            map[string]float64 `json:"evaluation"`
@@ -59,8 +59,8 @@ func (m Model) Validate(bucket string) error {
 		return errors.New("Track B requires device_classification; Track A requires particle_composition")
 	}
 	u, err := url.Parse(m.ArtifactS3URI)
-	if err != nil || u.Scheme != "s3" || u.Host != bucket || !(strings.HasPrefix(u.Path, "/models/") || strings.HasPrefix(u.Path,"/model-artifacts/")) || strings.HasSuffix(u.Path,"/") || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
-		return errors.New("artifact_s3_uri must reference this bucket's models/ prefix")
+	if err != nil || u.Scheme != "s3" || u.Host != bucket || !(strings.HasPrefix(u.Path, "/models/") || strings.HasPrefix(u.Path, "/model-artifacts/")) || strings.HasSuffix(u.Path, "/") || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+		return errors.New("artifact_s3_uri must reference this bucket's models/ or model-artifacts/ prefix")
 	}
 	if !hashPattern.MatchString(m.ArtifactSHA256) || !hashPattern.MatchString(m.DatasetManifestSHA256) || !jobPattern.MatchString(m.TrainingJobARN) || m.DataVersion == "" || m.Architecture == "" {
 		return errors.New("artifact/dataset hashes, training_job_arn, data_version and architecture required")
@@ -79,7 +79,11 @@ func (m Model) Validate(bucket string) error {
 		seen[label] = true
 	}
 	p := m.Preprocessing
-	for _,label:=range m.BatteryReviewLabels {if !seen[label]{return errors.New("battery_review_labels must be registered device labels")}}
+	for _, label := range m.BatteryReviewLabels {
+		if !seen[label] {
+			return errors.New("battery_review_labels must be registered device labels")
+		}
+	}
 	if p.Width < 1 || p.Width > 4096 || p.Height < 1 || p.Height > 4096 || p.ColorMode != "RGB" || !finite(p.Scale) || p.Scale <= 0 || len(p.Mean) != 3 || len(p.Std) != 3 {
 		return errors.New("RGB dimensions, positive scale, and 3-channel mean/std required")
 	}

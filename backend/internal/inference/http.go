@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"time"
@@ -58,7 +59,8 @@ func (h *HTTP) Predict(ctx context.Context, in Request) (Response, error) {
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return out, ErrUnavailable
 	}
-	if res.Header.Get("Content-Type") != "application/json" && res.Header.Get("Content-Type") != "application/json; charset=utf-8" {
+	media, _, parseErr := mime.ParseMediaType(res.Header.Get("Content-Type"))
+	if parseErr != nil || media != "application/json" {
 		return out, ErrInvalidResponse
 	}
 	body, err := io.ReadAll(io.LimitReader(res.Body, 256*1024+1))

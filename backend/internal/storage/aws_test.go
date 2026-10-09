@@ -144,3 +144,48 @@ func TestS3SDKRoundTrip(t *testing.T) {
 		t.Fatal(string(got), err)
 	}
 }
+func TestDynamoAtomicPredictionWrites(t *testing.T) {
+	conflict := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Amz-Target") != "DynamoDB_20120810.TransactWriteItems" {
+			t.Error("expected atomic write")
+		}
+		var p struct {
+			TransactItems []struct {
+				Put struct {
+					TableName                 string
+					ConditionExpression       string
+					Item                      map[string]any
+					ExpressionAttributeValues map[string]any
+				}
+			}
+		}
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			t.Error(err)
+		}
+		if len(p.TransactItems) != 2 || p.TransactItems[0].Put.ConditionExpression != "attribute_not_exists(pk)" || p.TransactItems[1].Put.ConditionExpression != "#v = :v" {
+			t.Error("prediction must create and batch must compare version")
+		}
+		if p.TransactItems[1].Put.ExpressionAttributeValues[":v"].(map[string]any)["N"] != "3" {
+			t.Error("expected batch version missing")
+		}
+		w.Header().Set("Content-Type", "application/x-amz-json-1.0")
+		if conflict {
+			w.WriteHeader(400)
+			_, _ = io.WriteString(w, `{"__type":"com.amazonaws.dynamodb.v20120810#TransactionCanceledException","message":"conflict","CancellationReasons":[{"Code":"None"},{"Code":"ConditionalCheckFailed"}]}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer server.Close()
+	client := dynamodb.NewFromConfig(sdkConfig(), func(o *dynamodb.Options) { o.BaseEndpoint = aws.String(server.URL) })
+	d := Dynamo{client, "records"}
+	writes := []Write{{"model_outputs", "prediction", 0, map[string]any{"id": "prediction"}}, {"batches", "batch", 3, map[string]any{"version": 4}}}
+	if err := d.SaveAll(context.Background(), writes); err != nil {
+		t.Fatal(err)
+	}
+	conflict = true
+	if err := d.SaveAll(context.Background(), writes); !errors.Is(err, ErrConflict) {
+		t.Fatal("transaction conflict not mapped", err)
+	}
+}
