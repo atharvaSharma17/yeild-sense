@@ -42,6 +42,22 @@ func (r *records) Save(_ context.Context, kind, id string, expected int, v any) 
 	r.versions[k] = expected + 1
 	return nil
 }
+func (r *records) SaveAll(ctx context.Context, writes []storage.Write) error {
+	for _, w := range writes {
+		if r.versions[w.Kind+w.ID] != w.Expected {
+			return storage.ErrConflict
+		}
+		if _, err := json.Marshal(w.Value); err != nil {
+			return err
+		}
+	}
+	for _, w := range writes {
+		if err := r.Save(ctx, w.Kind, w.ID, w.Expected, w.Value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (r *records) List(_ context.Context, kind, cursor string, limit int) ([]json.RawMessage, string, error) {
 	items := []json.RawMessage{}
 	for k, v := range r.data {

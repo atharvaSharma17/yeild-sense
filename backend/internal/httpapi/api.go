@@ -24,27 +24,33 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 	"yieldsense/backend/internal/domain"
+	"yieldsense/backend/internal/inference"
 	"yieldsense/backend/internal/storage"
 )
 
 type API struct {
-	Records storage.Repository
-	Objects storage.Blobs
-	Key     string
-	Origins []string
-	slots   chan struct{}
+	Predictor           inference.Predictor
+	Bucket              string
+	DefaultModelVersion string
+	mlSlots             chan struct{}
+	Records             storage.Repository
+	Objects             storage.Blobs
+	Key                 string
+	Origins             []string
+	slots               chan struct{}
 }
 type Run struct {
-	ID          string        `json:"id"`
-	ParentID    string        `json:"parent_id,omitempty"`
-	CreatedAt   string        `json:"created_at"`
-	InputSHA256 string        `json:"input_sha256"`
-	Input       domain.Input  `json:"input"`
-	Result      domain.Result `json:"result"`
-	Currency    string        `json:"currency"`
-	MassUnit    string        `json:"mass_unit"`
-	Solver      string        `json:"solver"`
-	Limitations []string      `json:"limitations"`
+	ModelOutputs []Prediction  `json:"model_outputs,omitempty"`
+	ID           string        `json:"id"`
+	ParentID     string        `json:"parent_id,omitempty"`
+	CreatedAt    string        `json:"created_at"`
+	InputSHA256  string        `json:"input_sha256"`
+	Input        domain.Input  `json:"input"`
+	Result       domain.Result `json:"result"`
+	Currency     string        `json:"currency"`
+	MassUnit     string        `json:"mass_unit"`
+	Solver       string        `json:"solver"`
+	Limitations  []string      `json:"limitations"`
 }
 type runRecord struct {
 	ID          string `json:"id"`
@@ -85,6 +91,7 @@ func decode(c *echo.Context, out any) error {
 func (a *API) Echo() *echo.Echo {
 	e := echo.New()
 	a.slots = make(chan struct{}, 2)
+	a.mlSlots = make(chan struct{}, 2)
 	e.Use(middleware.Recover(), middleware.RequestID(), middleware.RequestLogger())
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
@@ -124,7 +131,7 @@ func (a *API) Echo() *echo.Echo {
 		_ = c.JSON(code, map[string]any{"error": message, "request_id": c.Response().Header().Get("X-Request-ID")})
 	}
 	e.GET("/health", func(c *echo.Context) error {
-		return c.JSON(200, map[string]any{"ok": true, "service": "yieldsense", "solver": "go-branch-and-bound"})
+		return c.JSON(200, map[string]any{"ok": true, "service": "yieldsense", "solver": "go-branch-and-bound", "ml_configured": a.Predictor != nil})
 	})
 	v := e.Group("/v1", func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
@@ -142,6 +149,13 @@ func (a *API) Echo() *echo.Echo {
 	v.PUT("/batches/:id", a.updateBatch)
 	v.POST("/composition", a.composition)
 	v.POST("/batches/:id/images", a.image)
+	v.GET("/images/:id", a.get("images"))
+	v.POST("/models", a.registerModel)
+	v.GET("/models", a.list("models"))
+	v.GET("/models/:id", a.get("models"))
+	v.POST("/predict-device", a.predict(inference.DeviceTask))
+	v.POST("/predict-composition", a.predict(inference.CompositionTask))
+	v.GET("/predictions/:id", a.get("model_outputs"))
 	v.POST("/routes", a.createRoute)
 	v.GET("/routes", a.list("routes"))
 	v.GET("/routes/:id", a.get("routes"))
@@ -210,6 +224,10 @@ func (a *API) createBatch(c *echo.Context) error {
 	b.BatteryStatus = "unknown"
 	b.ReviewStatus = "pending"
 	b.ReviewEvidence = ""
+	b.LatestPredictionID = ""
+	if b.Composition != nil && b.Composition.Source == "model" {
+		return bad("create batch first, then use Track A prediction to attach model composition")
+	}
 	if err := b.Validate(); err != nil {
 		return bad(err.Error())
 	}
@@ -234,6 +252,10 @@ func (a *API) updateBatch(c *echo.Context) error {
 	b.ID = old.ID
 	b.CreatedAt = old.CreatedAt
 	b.Version = old.Version + 1
+	b.LatestPredictionID = old.LatestPredictionID
+	if err := a.validateModelComposition(ctx, b.ID, b.Composition); err != nil {
+		return err
+	}
 	if err := b.Validate(); err != nil {
 		return bad(err.Error())
 	}
@@ -263,6 +285,9 @@ func (a *API) composition(c *echo.Context) error {
 		return err
 	}
 	old := b.Version
+	if err := a.validateModelComposition(ctx, b.ID, &p.Composition); err != nil {
+		return err
+	}
 	b.Version++
 	b.Composition = &p.Composition
 	if err := a.Records.Save(ctx, "batches", b.ID, old, b); err != nil {
@@ -390,6 +415,19 @@ func (a *API) execute(c *echo.Context, in domain.Input, parent string) error {
 	if err := in.Validate(); err != nil {
 		return bad(err.Error())
 	}
+	evidence := []Prediction{}
+	for _, b := range in.Batches {
+		if b.LatestPredictionID != "" {
+			var p Prediction
+			if err := a.Records.Get(c.Request().Context(), "model_outputs", b.LatestPredictionID, &p); err != nil {
+				return err
+			}
+			if p.BatchID != b.ID {
+				return errors.New("invalid stored model output batch")
+			}
+			evidence = append(evidence, p)
+		}
+	}
 	select {
 	case a.slots <- struct{}{}:
 		defer func() { <-a.slots }()
@@ -411,6 +449,8 @@ func (a *API) execute(c *echo.Context, in domain.Input, parent string) error {
 	}
 	hash := sha256.Sum256(raw)
 	run := Run{ID: ID(), ParentID: parent, CreatedAt: now(), InputSHA256: hex.EncodeToString(hash[:]), Input: in, Result: result, Currency: "INR", MassUnit: "kg", Solver: "go-branch-and-bound-v1", Limitations: []string{"Modeled contribution, not measured savings; includes only supplied costs.", "Worst value covers supplied joint scenarios only; uncertainty is not statistically calibrated.", "No image inference or automatic safety certification; review evidence is operator supplied.", "Each run is an independent plan; capacity is not reserved across runs."}}
+	run.ModelOutputs = evidence
+	run.Limitations[2] = "Image predictions are supporting evidence; battery clearance and authorization require human review. Model training/evaluation provenance is supplied by the ML developer."
 	data, err := json.Marshal(run)
 	if err != nil {
 		return err

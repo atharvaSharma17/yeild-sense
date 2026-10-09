@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -23,6 +24,13 @@ type Repository interface {
 	Get(context.Context, string, string, any) error
 	Save(context.Context, string, string, int, any) error
 	List(context.Context, string, string, int) ([]json.RawMessage, string, error)
+	SaveAll(context.Context, []Write) error
+}
+type Write struct {
+	Kind     string
+	ID       string
+	Expected int
+	Value    any
 }
 type Blobs interface {
 	Put(context.Context, string, []byte, string) error
@@ -105,6 +113,43 @@ func (d *Dynamo) List(ctx context.Context, kind, cursor string, limit int) ([]js
 	return items, next, nil
 }
 
+// SaveAll atomically commits prediction evidence and its batch safety state.
+func (d *Dynamo) SaveAll(ctx context.Context, writes []Write) error {
+	if len(writes) < 1 || len(writes) > 25 {
+		return errors.New("provide 1-25 transactional writes")
+	}
+	items := make([]dt.TransactWriteItem, 0, len(writes))
+	for _, w := range writes {
+		p, err := json.Marshal(w.Value)
+		if err != nil {
+			return err
+		}
+		if len(p) > 300*1024 {
+			return errors.New("record exceeds 300 KiB")
+		}
+		item := key(w.Kind, w.ID)
+		item["payload"] = str(string(p))
+		item["version"] = &dt.AttributeValueMemberN{Value: strconv.Itoa(w.Expected + 1)}
+		put := &dt.Put{TableName: aws.String(d.Table), Item: item, ConditionExpression: aws.String("attribute_not_exists(pk)")}
+		if w.Expected > 0 {
+			put.ConditionExpression = aws.String("#v = :v")
+			put.ExpressionAttributeNames = map[string]string{"#v": "version"}
+			put.ExpressionAttributeValues = map[string]dt.AttributeValue{":v": &dt.AttributeValueMemberN{Value: strconv.Itoa(w.Expected)}}
+		}
+		items = append(items, dt.TransactWriteItem{Put: put})
+	}
+	_, err := d.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
+	var canceled *dt.TransactionCanceledException
+	if errors.As(err, &canceled) {
+		for _, r := range canceled.CancellationReasons {
+			if aws.ToString(r.Code) == "ConditionalCheckFailed" {
+				return ErrConflict
+			}
+		}
+	}
+	return err
+}
+
 type S3 struct {
 	Client *s3.Client
 	Bucket string
@@ -120,8 +165,12 @@ func (s *S3) Get(ctx context.Context, key string) ([]byte, error) {
 		return nil, err
 	}
 	defer r.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(r.Body, 8*1024*1024+1))
-	if len(data) > 8*1024*1024 {
+	limit := int64(8 * 1024 * 1024)
+	if strings.HasPrefix(key, "raw/") {
+		limit = 10 * 1024 * 1024
+	}
+	data, err := io.ReadAll(io.LimitReader(r.Body, limit+1))
+	if int64(len(data)) > limit {
 		return nil, errors.New("object exceeds read limit")
 	}
 	return data, err

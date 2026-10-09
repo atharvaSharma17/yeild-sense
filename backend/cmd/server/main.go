@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 	"yieldsense/backend/internal/httpapi"
+	"yieldsense/backend/internal/inference"
 	"yieldsense/backend/internal/storage"
 )
 
@@ -50,6 +51,15 @@ func run() error {
 		}
 	}
 	a := httpapi.API{Records: &storage.Dynamo{Client: d, Table: table}, Objects: &storage.S3{Client: s, Bucket: bucket}, Key: key, Origins: origins}
+	a.Bucket = bucket
+	a.DefaultModelVersion = os.Getenv("DEFAULT_MODEL_VERSION")
+	if endpoint := os.Getenv("ML_INFERENCE_URL"); endpoint != "" {
+		adapter, err := inference.NewHTTP(endpoint, os.Getenv("ML_INFERENCE_TOKEN"))
+		if err != nil {
+			return err
+		}
+		a.Predictor = adapter
+	}
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" {
 		addr = ":8080"
