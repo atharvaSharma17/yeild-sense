@@ -8,10 +8,16 @@ param(
     [string]$TableName = 'yieldsense',
     [string]$CorsOrigins = '',
     [ValidateRange(1,10)]
-    [int]$MaxTasks = 2
+    [int]$MaxTasks = 2,
+    [ValidatePattern('^$|^sha256:[a-f0-9]{64}$')]
+    [string]$MLWorkerDigest = '',
+    [string]$MLInferenceURL = '',
+    [ValidatePattern('^$|^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$')]
+    [string]$DefaultModelVersion = ''
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+if ($MLWorkerDigest -and $MLInferenceURL) { throw 'Choose MLWorkerDigest or MLInferenceURL, not both.' }
 foreach ($tool in @('aws', 'docker')) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "Install $tool before deploying." }
 }
@@ -69,6 +75,7 @@ Write-Host 'Deploying the Go API with managed HTTPS ingress...'
 Invoke-Aws -Arguments @('cloudformation', 'deploy', '--template-file', $serviceTemplate,
     '--stack-name', $service, '--capabilities', 'CAPABILITY_IAM', '--parameter-overrides',
     "FoundationStack=$foundation", "ImageDigest=$digest", "CorsOrigins=$CorsOrigins", "MaxTasks=$MaxTasks",
+    "MLWorkerDigest=$MLWorkerDigest", "MLInferenceURL=$MLInferenceURL", "DefaultModelVersion=$DefaultModelVersion",
     '--no-fail-on-empty-changeset') | Out-Host
 Invoke-Aws -Arguments @('cloudformation', 'describe-stacks', '--stack-name', $service,
     '--query', 'Stacks[0].Outputs', '--output', 'table') | Out-Host

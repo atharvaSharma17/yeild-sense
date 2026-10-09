@@ -18,6 +18,26 @@ Parameters:
     Default: 2
     MinValue: 1
     MaxValue: 10
+  MLWorkerDigest:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^sha256:[a-f0-9]{64}$'
+    Description: Optional CPU inference worker image digest in the foundation ECR repository
+  MLInferenceURL:
+    Type: String
+    Default: ''
+    Description: Optional inference URL for a separately hosted worker; leave blank when using MLWorkerDigest
+  DefaultModelVersion:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$'
+Conditions:
+  HasMLWorker: !Not [!Equals [!Ref MLWorkerDigest, '']]
+Rules:
+  OneInferenceDestination:
+    Assertions:
+      - Assert: !Or [!Equals [!Ref MLWorkerDigest, ''], !Equals [!Ref MLInferenceURL, '']]
+        AssertDescription: Choose MLWorkerDigest or MLInferenceURL, not both
 Resources:
   VPC:
     Type: AWS::EC2::VPC
@@ -122,6 +142,17 @@ Resources:
                     - ''
                     - - Fn::ImportValue: !Sub '${FoundationStack}-S3BucketArn'
                       - /reports/*
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Join
+                    - ''
+                    - - Fn::ImportValue: !Sub '${FoundationStack}-S3BucketArn'
+                      - /models/*
+                  - !Join
+                    - ''
+                    - - Fn::ImportValue: !Sub '${FoundationStack}-S3BucketArn'
+                      - /model-artifacts/*
   ExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -168,16 +199,95 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices'
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: '1024'
+      Memory: '2048'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        # Express Mode requires the application container to be named Main.
+        - Name: Main
+          Essential: true
+          Image: !Join
+            - '@'
+            - - Fn::ImportValue: !Sub '${FoundationStack}-RepositoryUri'
+              - !Ref ImageDigest
+          PortMappings:
+            - Name: http
+              ContainerPort: 8080
+              Protocol: tcp
+              AppProtocol: http
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref Logs
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: api
+          Environment:
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: LISTEN_ADDR
+              Value: ':8080'
+            - Name: DYNAMODB_TABLE
+              Value:
+                Fn::ImportValue: !Sub '${FoundationStack}-DynamoDBTable'
+            - Name: S3_BUCKET
+              Value:
+                Fn::ImportValue: !Sub '${FoundationStack}-S3Bucket'
+            - Name: CORS_ORIGINS
+              Value: !Ref CorsOrigins
+            - Name: ML_INFERENCE_URL
+              Value: !If [HasMLWorker, 'http://127.0.0.1:9000/predict', !Ref MLInferenceURL]
+            - Name: DEFAULT_MODEL_VERSION
+              Value: !Ref DefaultModelVersion
+          Secrets:
+            - Name: API_KEY
+              ValueFrom:
+                Fn::ImportValue: !Sub '${FoundationStack}-APIKeySecretArn'
+            - Name: ML_INFERENCE_TOKEN
+              ValueFrom:
+                Fn::ImportValue: !Sub '${FoundationStack}-APIKeySecretArn'
+        - !If
+          - HasMLWorker
+          - Name: inference
+            Essential: false
+            Image: !Join
+              - '@'
+              - - Fn::ImportValue: !Sub '${FoundationStack}-RepositoryUri'
+                - !Ref MLWorkerDigest
+            Environment:
+              - Name: AWS_REGION
+                Value: !Ref AWS::Region
+              - Name: S3_BUCKET
+                Value:
+                  Fn::ImportValue: !Sub '${FoundationStack}-S3Bucket'
+              - Name: ML_LISTEN_ADDR
+                Value: '127.0.0.1:9000'
+            Secrets:
+              - Name: ML_INFERENCE_TOKEN
+                ValueFrom:
+                  Fn::ImportValue: !Sub '${FoundationStack}-APIKeySecretArn'
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref Logs
+                awslogs-region: !Ref AWS::Region
+                awslogs-stream-prefix: inference
+          - !Ref AWS::NoValue
   API:
     Type: AWS::ECS::ExpressGatewayService
     DependsOn: [InternetRoute, SubnetARoutes, SubnetBRoutes, S3Endpoint, DynamoDBEndpoint]
     Properties:
       Cluster: !Ref Cluster
       ServiceName: !Sub '${AWS::StackName}-api'
-      Cpu: '1024'
-      Memory: '2048'
-      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
-      TaskRoleArn: !GetAtt TaskRole.Arn
+      TaskDefinitionArn: !Ref TaskDefinition
       InfrastructureRoleArn: !GetAtt InfrastructureRole.Arn
       HealthCheckPath: /health
       NetworkConfiguration:
@@ -187,32 +297,6 @@ Resources:
         AutoScalingTargetValue: 60
         MinTaskCount: 1
         MaxTaskCount: !Ref MaxTasks
-      PrimaryContainer:
-        Image: !Join
-          - '@'
-          - - Fn::ImportValue: !Sub '${FoundationStack}-RepositoryUri'
-            - !Ref ImageDigest
-        ContainerPort: 8080
-        AwsLogsConfiguration:
-          LogGroup: !Ref Logs
-          LogStreamPrefix: api
-        Environment:
-          - Name: AWS_REGION
-            Value: !Ref AWS::Region
-          - Name: LISTEN_ADDR
-            Value: ':8080'
-          - Name: DYNAMODB_TABLE
-            Value:
-              Fn::ImportValue: !Sub '${FoundationStack}-DynamoDBTable'
-          - Name: S3_BUCKET
-            Value:
-              Fn::ImportValue: !Sub '${FoundationStack}-S3Bucket'
-          - Name: CORS_ORIGINS
-            Value: !Ref CorsOrigins
-        Secrets:
-          - Name: API_KEY
-            ValueFrom:
-              Fn::ImportValue: !Sub '${FoundationStack}-APIKeySecretArn'
 Outputs:
   Endpoint:
     Description: Managed HTTPS API endpoint

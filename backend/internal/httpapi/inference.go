@@ -142,7 +142,7 @@ func (a *API) predict(task string) echo.HandlerFunc {
 		b.Version++
 		b.LatestPredictionID = req.RequestID
 		// ML may request review, but may never clear a battery or approve a batch.
-		if assessment.Abstained || result.BatteryAlert != "none" {
+		if assessment.Abstained || result.BatteryAlert == "suspected" {
 			b.ReviewStatus = "pending"
 			if result.BatteryAlert == "suspected" {
 				b.BatteryStatus = "suspected"
