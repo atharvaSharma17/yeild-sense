@@ -1,15 +1,20 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -65,6 +70,8 @@ func decode(c *echo.Context, out any) error {
 	d := json.NewDecoder(c.Request().Body)
 	d.DisallowUnknownFields()
 	if err := d.Decode(out); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) { return err }
 		return echo.NewHTTPError(400, "invalid JSON: "+err.Error())
 	}
 	var extra any
@@ -119,8 +126,9 @@ func (a *API) Echo() *echo.Echo {
 	})
 	v := e.Group("/v1", func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			token := strings.TrimPrefix(c.Request().Header.Get("Authorization"), "Bearer ")
-			if a.Key == "" || subtle.ConstantTimeCompare([]byte(token), []byte(a.Key)) != 1 {
+			header := c.Request().Header.Get("Authorization")
+			token := strings.TrimPrefix(header, "Bearer ")
+			if !strings.HasPrefix(header, "Bearer ") || a.Key == "" || subtle.ConstantTimeCompare([]byte(token), []byte(a.Key)) != 1 {
 				return echo.NewHTTPError(401, "valid bearer API key required")
 			}
 			return next(c)
@@ -166,6 +174,7 @@ func (a *API) list(kind string) echo.HandlerFunc {
 		if len(cursor) > 300 {
 			return bad("invalid cursor")
 		}
+		if cursor != "" { decoded, err := base64.RawURLEncoding.DecodeString(cursor); if err != nil || len(decoded)==0 || len(decoded)>200 { return bad("invalid cursor") } }
 		items, next, err := a.Records.List(c.Request().Context(), kind, cursor, limit)
 		if err != nil {
 			return err
@@ -317,6 +326,9 @@ func (a *API) image(c *echo.Context) error {
 		return echo.NewHTTPError(415, "only JPEG and PNG images accepted")
 	}
 	id := ID()
+	config, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil || config.Width < 1 || config.Height < 1 || int64(config.Width)*int64(config.Height)>16_000_000 { return bad("invalid image or image exceeds 16 megapixels") }
+	if _, _, err := image.Decode(bytes.NewReader(data)); err != nil { return bad("invalid image data") }
 	key := "raw/" + b.ID + "/" + id + ext
 	sum := sha256.Sum256(data)
 	if err := a.Objects.Put(ctx, key, data, mime); err != nil {
