@@ -1,0 +1,4 @@
+backend/.env
+backend/*.exe
+backend/coverage.out
+*.test
