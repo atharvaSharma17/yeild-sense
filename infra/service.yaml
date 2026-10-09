@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: YieldSense Go API on ECS Fargate Express Mode with managed HTTPS ingress
+Parameters:
+  FoundationStack:
+    Type: String
+    Default: yieldsense-storage
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9-]{0,127}'
+  ImageDigest:
+    Type: String
+    Description: Digest of the uploaded linux/amd64 image
+    AllowedPattern: 'sha256:[a-f0-9]{64}'
+  CorsOrigins:
+    Type: String
+    Default: ''
+    Description: Comma-separated allowed frontend origins; blank disables browser CORS
+  MaxTasks:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.42.0.0/24
+      MapPublicIpOnLaunch: true
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.42.1.0/24
+      MapPublicIpOnLaunch: true
+  PublicRoutes:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRoutes
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  SubnetARoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRoutes
+  SubnetBRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRoutes
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      VpcEndpointType: Gateway
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      RouteTableIds: [!Ref PublicRoutes]
+  DynamoDBEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      VpcEndpointType: Gateway
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
+      RouteTableIds: [!Ref PublicRoutes]
+  Cluster:
+    Type: AWS::ECS::Cluster
+  Logs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:*'
+      Policies:
+        - PolicyName: ApplicationStorage
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:Query]
+                Resource:
+                  Fn::ImportValue: !Sub '${FoundationStack}-DynamoDBTableArn'
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource:
+                  - !Join
+                    - ''
+                    - - Fn::ImportValue: !Sub '${FoundationStack}-S3BucketArn'
+                      - /raw/*
+                  - !Join
+                    - ''
+                    - - Fn::ImportValue: !Sub '${FoundationStack}-S3BucketArn'
+                      - /reports/*
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:*'
+      Policies:
+        - PolicyName: ContainerStartup
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability]
+                Resource:
+                  Fn::ImportValue: !Sub '${FoundationStack}-RepositoryArn'
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt Logs.Arn
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  Fn::ImportValue: !Sub '${FoundationStack}-APIKeySecretArn'
+  InfrastructureRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices'
+  API:
+    Type: AWS::ECS::ExpressGatewayService
+    DependsOn: [InternetRoute, SubnetARoutes, SubnetBRoutes, S3Endpoint, DynamoDBEndpoint]
+    Properties:
+      Cluster: !Ref Cluster
+      ServiceName: !Sub '${AWS::StackName}-api'
+      Cpu: '1024'
+      Memory: '2048'
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      InfrastructureRoleArn: !GetAtt InfrastructureRole.Arn
+      HealthCheckPath: /health
+      NetworkConfiguration:
+        Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+      ScalingTarget:
+        AutoScalingMetric: AVERAGE_CPU
+        AutoScalingTargetValue: 60
+        MinTaskCount: 1
+        MaxTaskCount: !Ref MaxTasks
+      PrimaryContainer:
+        Image: !Join
+          - '@'
+          - - Fn::ImportValue: !Sub '${FoundationStack}-RepositoryUri'
+            - !Ref ImageDigest
+        ContainerPort: 8080
+        AwsLogsConfiguration:
+          LogGroup: !Ref Logs
+          LogStreamPrefix: api
+        Environment:
+          - Name: AWS_REGION
+            Value: !Ref AWS::Region
+          - Name: LISTEN_ADDR
+            Value: ':8080'
+          - Name: DYNAMODB_TABLE
+            Value:
+              Fn::ImportValue: !Sub '${FoundationStack}-DynamoDBTable'
+          - Name: S3_BUCKET
+            Value:
+              Fn::ImportValue: !Sub '${FoundationStack}-S3Bucket'
+          - Name: CORS_ORIGINS
+            Value: !Ref CorsOrigins
+        Secrets:
+          - Name: API_KEY
+            ValueFrom:
+              Fn::ImportValue: !Sub '${FoundationStack}-APIKeySecretArn'
+Outputs:
+  Endpoint:
+    Description: Managed HTTPS API endpoint
+    Value: !GetAtt API.Endpoint
+  ServiceArn:
+    Value: !GetAtt API.ServiceArn
+  LogGroup:
+    Value: !Ref Logs
+  VpcId:
+    Value: !Ref VPC

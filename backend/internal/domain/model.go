@@ -12,12 +12,15 @@ var BatteryStates = []string{"unknown", "suspected", "present", "cleared"}
 
 type Fractions map[string]float64
 type Composition struct {
+	Track string `json:"track,omitempty"`
+	ModelOutputID string `json:"model_output_id,omitempty"`
 	Source       string      `json:"source"`
 	Evidence     string      `json:"evidence"`
 	ModelVersion string      `json:"model_version,omitempty"`
 	Scenarios    []Fractions `json:"scenarios"`
 }
 type Batch struct {
+	LatestPredictionID string `json:"latest_prediction_id,omitempty"`
 	ID             string       `json:"id"`
 	Version        int          `json:"version"`
 	CreatedAt      string       `json:"created_at"`
@@ -72,6 +75,8 @@ func (c Composition) Validate() error {
 	if c.Source == "model" && c.ModelVersion == "" {
 		return errors.New("modeled composition requires model_version")
 	}
+	if c.Source=="model" && (c.Track!="A" || c.ModelOutputID=="") {return errors.New("modeled material composition requires Track A and model_output_id")}
+	if c.Track!="" && c.Track!="A" && c.Track!="B" {return errors.New("track must be A or B")}
 	if len(c.Scenarios) < 1 || len(c.Scenarios) > 20 {
 		return errors.New("provide 1 to 20 joint scenarios")
 	}

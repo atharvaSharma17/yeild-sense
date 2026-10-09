@@ -4,6 +4,8 @@ Go 1.26.1, Echo v5, AWS SDK v2. Runtime persistence uses **only DynamoDB and S3*
 
 ## Setup
 
+For a complete hosted deployment, run `./infra/deploy.ps1 -Region ap-south-1` from the repository root. See [the deployment guide](../infra/README.md). It builds/pushes the backend and provisions ECS Fargate with HTTPS, S3, DynamoDB and the API credential.
+
 Provision the two storage services using `infra/storage.yaml` from the repository root:
 
 ```powershell
@@ -11,7 +13,7 @@ aws cloudformation deploy --template-file infra/storage.yaml --stack-name yields
 aws cloudformation describe-stacks --stack-name yieldsense-storage --region ap-south-1 --query 'Stacks[0].Outputs'
 ```
 
-The template creates a private, encrypted, versioned S3 bucket and a pay-per-request DynamoDB table with `pk` (string partition key) and `sk` (string sort key), with point-in-time recovery. Resources are retained when the stack is deleted.
+The template creates a private, encrypted, versioned S3 bucket and a pay-per-request DynamoDB table with `pk` (string partition key) and `sk` (string sort key), with point-in-time recovery. It also creates an ECR repository and generated API key for hosted deployment. Resources are retained when the stack is deleted.
 
 Use AWS's default credential chain (local AWS profile or deployment role). The API needs `dynamodb:GetItem`, `dynamodb:PutItem`, and `dynamodb:Query` on the table, and `s3:PutObject` and `s3:GetObject` on the bucket's `raw/*` and `reports/*` objects. It does not create resources on startup.
 

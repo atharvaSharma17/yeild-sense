@@ -4,4 +4,6 @@ The backend is implemented in **Go with Echo v5**, using **Amazon DynamoDB and S
 
 See [backend setup and API documentation](backend/README.md), [storage infrastructure](infra/storage.yaml), and the [end-to-end demo](scripts/demo-backend.ps1).
 
+Deploy the backend and provision storage with `./infra/deploy.ps1 -Region ap-south-1`. See the [infrastructure deployment guide](infra/README.md) for AWS setup, configuration and cleanup.
+
 `HLD.md` and `Implementation_Guide.md` contain the original design, including Python/FastAPI, OR-Tools, and SageMaker proposals. For the implemented backend, `backend/README.md` supersedes those stack choices: the optimizer runs in Go and there is no ML inference service. Frontend and ML directories remain placeholders.

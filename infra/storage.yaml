@@ -1,9 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: YieldSense storage - S3 and DynamoDB only
+Description: YieldSense foundation - S3, DynamoDB, container registry and API credential
 Parameters:
   TableName:
     Type: String
     Default: yieldsense
+    AllowedPattern: '[a-zA-Z0-9_.-]{3,255}'
 Resources:
   Records:
     Type: AWS::DynamoDB::Table
@@ -60,11 +61,54 @@ Resources:
               - !Sub '${Artifacts.Arn}/*'
             Condition:
               Bool:
-                aws:SecureTransport: false
+                aws:SecureTransport: 'false'
+  Images:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+  APIKey:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: YieldSense bearer API key injected into the ECS container
+      GenerateSecretString:
+        PasswordLength: 48
+        ExcludePunctuation: true
 Outputs:
   DynamoDBTable:
     Value: !Ref Records
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBTable'
   S3Bucket:
     Value: !Ref Artifacts
+    Export:
+      Name: !Sub '${AWS::StackName}-S3Bucket'
   DynamoDBTableArn:
     Value: !GetAtt Records.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBTableArn'
+  S3BucketArn:
+    Value: !GetAtt Artifacts.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-S3BucketArn'
+  RepositoryUri:
+    Value: !GetAtt Images.RepositoryUri
+    Export:
+      Name: !Sub '${AWS::StackName}-RepositoryUri'
+  RepositoryArn:
+    Value: !GetAtt Images.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-RepositoryArn'
+  RepositoryName:
+    Value: !Ref Images
+  APIKeySecretArn:
+    Value: !Ref APIKey
+    Export:
+      Name: !Sub '${AWS::StackName}-APIKeySecretArn'
