@@ -6,15 +6,15 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -71,7 +71,9 @@ func decode(c *echo.Context, out any) error {
 	d.DisallowUnknownFields()
 	if err := d.Decode(out); err != nil {
 		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) { return err }
+		if errors.As(err, &tooLarge) {
+			return err
+		}
 		return echo.NewHTTPError(400, "invalid JSON: "+err.Error())
 	}
 	var extra any
@@ -174,7 +176,12 @@ func (a *API) list(kind string) echo.HandlerFunc {
 		if len(cursor) > 300 {
 			return bad("invalid cursor")
 		}
-		if cursor != "" { decoded, err := base64.RawURLEncoding.DecodeString(cursor); if err != nil || len(decoded)==0 || len(decoded)>200 { return bad("invalid cursor") } }
+		if cursor != "" {
+			decoded, err := base64.RawURLEncoding.DecodeString(cursor)
+			if err != nil || len(decoded) == 0 || len(decoded) > 200 {
+				return bad("invalid cursor")
+			}
+		}
 		items, next, err := a.Records.List(c.Request().Context(), kind, cursor, limit)
 		if err != nil {
 			return err
@@ -327,8 +334,12 @@ func (a *API) image(c *echo.Context) error {
 	}
 	id := ID()
 	config, _, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil || config.Width < 1 || config.Height < 1 || int64(config.Width)*int64(config.Height)>16_000_000 { return bad("invalid image or image exceeds 16 megapixels") }
-	if _, _, err := image.Decode(bytes.NewReader(data)); err != nil { return bad("invalid image data") }
+	if err != nil || config.Width < 1 || config.Height < 1 || int64(config.Width)*int64(config.Height) > 16_000_000 {
+		return bad("invalid image or image exceeds 16 megapixels")
+	}
+	if _, _, err := image.Decode(bytes.NewReader(data)); err != nil {
+		return bad("invalid image data")
+	}
 	key := "raw/" + b.ID + "/" + id + ext
 	sum := sha256.Sum256(data)
 	if err := a.Objects.Put(ctx, key, data, mime); err != nil {
