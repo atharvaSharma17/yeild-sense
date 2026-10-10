@@ -1,0 +1,52 @@
+{
+  "categories": [
+    "AlarmClock",
+    "ComputerMouse",
+    "E-Razor",
+    "E-Toothbrush",
+    "FireAlarm",
+    "FlashLight",
+    "GameController",
+    "iPad",
+    "KidToy",
+    "MobilePhone",
+    "NewsRadio",
+    "NightTorch",
+    "PhotoCamera",
+    "RemoteControl",
+    "Thermometer"
+  ],
+  "high_risk_lithium_categories": [
+    "E-Razor",
+    "E-Toothbrush",
+    "GameController",
+    "MobilePhone",
+    "PhotoCamera",
+    "iPad"
+  ],
+  "xbat_to_futuram_category": {
+    "AlarmClock": "WEEE_Cat5",
+    "ComputerMouse": "WEEE_Cat6",
+    "E-Razor": "WEEE_Cat5",
+    "E-Toothbrush": "WEEE_Cat5",
+    "FireAlarm": "WEEE_Cat5",
+    "FlashLight": "WEEE_Cat5",
+    "GameController": "WEEE_Cat6",
+    "iPad": "WEEE_Cat6",
+    "KidToy": "WEEE_Cat5",
+    "MobilePhone": "WEEE_Cat6",
+    "NewsRadio": "WEEE_Cat5",
+    "NightTorch": "WEEE_Cat5",
+    "PhotoCamera": "WEEE_Cat6",
+    "RemoteControl": "WEEE_Cat5",
+    "Thermometer": "WEEE_Cat5"
+  },
+  "counts": {
+    "train": 247,
+    "calibration": 83,
+    "test": 91,
+    "train_hazards": 107,
+    "calibration_hazards": 36,
+    "test_hazards": 39
+  }
+}
