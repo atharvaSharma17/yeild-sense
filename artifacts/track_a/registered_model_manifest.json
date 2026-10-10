@@ -1,0 +1,47 @@
+{
+  "contract_version": "1",
+  "model_version": "rgb-mfco-particle-regressor-v1",
+  "track": "A",
+  "task": "particle_composition",
+  "architecture": "gbr_particle_mass_regressor",
+  "artifact_s3_uri": "s3://yieldsense-storage-ap-south-1/models/track_a/model.tar.gz",
+  "artifact_sha256": "ed8ec9474499926a86731f7448c590cd3f5c3c2d46201da0a478783c272e6fc2",
+  "dataset_manifest_sha256": "9a5e2b562768db21398bd5f6faae02e1dbb02eebcdcd808a0b334e22db620b49",
+  "data_version": "rgb-mfco-v1.0.0",
+  "training_job_arn": "arn:aws:sagemaker:ap-south-1:123456789012:training-job/yieldsense-track-a-rgb-mfco-v1",
+  "labels": [
+    "FEM",
+    "NFM",
+    "PCB",
+    "PLA",
+    "OTHER"
+  ],
+  "preprocessing": {
+    "width": 224,
+    "height": 224,
+    "color_mode": "RGB",
+    "scale": 0.00392156862745098,
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "confidence_threshold": 0.6,
+  "evaluation": {
+    "particle_mass_mae_g": 1.8552,
+    "particle_mass_r2": 0.5629,
+    "classification_accuracy": 0.8426,
+    "classification_macro_f1": 0.8423,
+    "mixed_batch_composition_mae": 0.0276,
+    "ms1_composition_mae": 0.0116,
+    "ms2_composition_mae": 0.0217,
+    "ms3_composition_mae": 0.0497
+  },
+  "paired_mass_evidence": "TU Darmstadt RGB-MFCO DS2 (1976 paired particles with calibrated scale masses) + DS3 real mixed batch validation"
+}

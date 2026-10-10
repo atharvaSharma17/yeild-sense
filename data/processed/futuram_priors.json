@@ -1,0 +1,322 @@
+{
+  "dataset": "FutuRaM Consolidated WEEE Composition v14.2",
+  "zenodo_record": "17789750",
+  "reference_slice": "Scenario=BAU, Year=2023, Stock/Flow=WEEE_generatedDedicated",
+  "classes": [
+    "FEM",
+    "NFM",
+    "PCB",
+    "PLA"
+  ],
+  "categories": {
+    "WEEE_Cat1": {
+      "category_id": "WEEE_Cat1",
+      "description": "Temperature Exchange Equipment (Cooling & Freezing Appliances)",
+      "mean": {
+        "FEM": 0.5175455323154472,
+        "NFM": 0.08400991055450746,
+        "PCB": 0.001175391953035082,
+        "PLA": 0.3972691651770103
+      },
+      "audit_ppm_2023_bau": {
+        "FEM_ppm": 517545.53,
+        "NFM_ppm": 84009.91,
+        "PCB_ppm": 1175.39,
+        "PLA_polymer_rest_ppm": 305500.03,
+        "OTHER_glass_ceramics_si_ppm": 91769.13,
+        "total_accounted_ppm": 1000000.0
+      },
+      "cross_scenario_year_std": {
+        "FEM": 0.009422807767999886,
+        "NFM": 0.010706761125643971,
+        "PCB": 0.0003156575701278235,
+        "PLA": 0.00559496468593634
+      },
+      "cross_scenario_year_min": {
+        "FEM": 0.4841278775975353,
+        "NFM": 0.06944666708702435,
+        "PCB": 0.001123189182016567,
+        "PLA": 0.395084450454582
+      },
+      "cross_scenario_year_max": {
+        "FEM": 0.5181139329330686,
+        "NFM": 0.10968014832282318,
+        "PCB": 0.0020820351569894,
+        "PLA": 0.4250611511235197
+      },
+      "n_trajectories_evaluated": 97
+    },
+    "WEEE_Cat2": {
+      "category_id": "WEEE_Cat2",
+      "description": "Screens, Monitors, and Equipment Containing Screens >100 cm2",
+      "mean": {
+        "FEM": 0.2338268151964926,
+        "NFM": 0.06336805555304946,
+        "PCB": 0.07341403904889879,
+        "PLA": 0.6293910902015591
+      },
+      "audit_ppm_2023_bau": {
+        "FEM_ppm": 233826.82,
+        "NFM_ppm": 63368.06,
+        "PCB_ppm": 73414.04,
+        "PLA_polymer_rest_ppm": 547283.27,
+        "OTHER_glass_ceramics_si_ppm": 82107.82,
+        "total_accounted_ppm": 1000000.0
+      },
+      "cross_scenario_year_std": {
+        "FEM": 0.050801080857065264,
+        "NFM": 0.008667976573416454,
+        "PCB": 0.0011276834560865515,
+        "PLA": 0.05889855908281035
+      },
+      "cross_scenario_year_min": {
+        "FEM": 0.07496506862272874,
+        "NFM": 0.031659693633152415,
+        "PCB": 0.07016660835866684,
+        "PLA": 0.5595362526133688
+      },
+      "cross_scenario_year_max": {
+        "FEM": 0.29682529659436035,
+        "NFM": 0.07347184243360404,
+        "PCB": 0.07404274947962979,
+        "PLA": 0.8207741978214762
+      },
+      "n_trajectories_evaluated": 97
+    },
+    "WEEE_Cat3": {
+      "category_id": "WEEE_Cat3",
+      "description": "Lamps and Lighting Equipment",
+      "mean": {
+        "FEM": 0.0173097381291134,
+        "NFM": 0.3312083044630355,
+        "PCB": 0.08336333162573013,
+        "PLA": 0.5681186257821209
+      },
+      "audit_ppm_2023_bau": {
+        "FEM_ppm": 17309.74,
+        "NFM_ppm": 331208.3,
+        "PCB_ppm": 83363.33,
+        "PLA_polymer_rest_ppm": 201526.09,
+        "OTHER_glass_ceramics_si_ppm": 366592.53,
+        "total_accounted_ppm": 1000000.0
+      },
+      "cross_scenario_year_std": {
+        "FEM": 0.008471355368675751,
+        "NFM": 0.11169963490284672,
+        "PCB": 0.046804882218551565,
+        "PLA": 0.14985020616693395
+      },
+      "cross_scenario_year_min": {
+        "FEM": 0.004203096197330376,
+        "NFM": 0.10260758199742231,
+        "PCB": 0.014376892039919058,
+        "PLA": 0.32372220105084254
+      },
+      "cross_scenario_year_max": {
+        "FEM": 0.03599318036979736,
+        "NFM": 0.5056157567055216,
+        "PCB": 0.16668569711310197,
+        "PLA": 0.8470223455928613
+      },
+      "n_trajectories_evaluated": 97
+    },
+    "WEEE_Cat4a": {
+      "category_id": "WEEE_Cat4a",
+      "description": "Large Household & Industrial Equipment",
+      "mean": {
+        "FEM": 0.5627563093729315,
+        "NFM": 0.043371809621913816,
+        "PCB": 0.005864941734717896,
+        "PLA": 0.38800693927043683
+      },
+      "audit_ppm_2023_bau": {
+        "FEM_ppm": 562756.31,
+        "NFM_ppm": 43371.81,
+        "PCB_ppm": 5864.94,
+        "PLA_polymer_rest_ppm": 370475.32,
+        "OTHER_glass_ceramics_si_ppm": 17531.62,
+        "total_accounted_ppm": 1000000.0
+      },
+      "cross_scenario_year_std": {
+        "FEM": 0.046413126112319,
+        "NFM": 0.005057543198797164,
+        "PCB": 0.0006147842881322979,
+        "PLA": 0.05114064917014716
+      },
+      "cross_scenario_year_min": {
+        "FEM": 0.4371241127940289,
+        "NFM": 0.031728122083566596,
+        "PCB": 0.004581055136937424,
+        "PLA": 0.34375854064995953
+      },
+      "cross_scenario_year_max": {
+        "FEM": 0.6032883815660228,
+        "NFM": 0.04778565109731861,
+        "PCB": 0.006838573676317719,
+        "PLA": 0.5265667099854671
+      },
+      "n_trajectories_evaluated": 97
+    },
+    "WEEE_Cat4b": {
+      "category_id": "WEEE_Cat4b",
+      "description": "Photovoltaic Panels",
+      "mean": {
+        "FEM": 0.031269529322839336,
+        "NFM": 0.11601801839313466,
+        "PCB": 0.0009849228032894329,
+        "PLA": 0.8517275294807366
+      },
+      "audit_ppm_2023_bau": {
+        "FEM_ppm": 31269.53,
+        "NFM_ppm": 116018.02,
+        "PCB_ppm": 984.92,
+        "PLA_polymer_rest_ppm": 167117.59,
+        "OTHER_glass_ceramics_si_ppm": 684609.94,
+        "total_accounted_ppm": 1000000.0
+      },
+      "cross_scenario_year_std": {
+        "FEM": 0.00568540952256417,
+        "NFM": 0.0019589533843111916,
+        "PCB": 0.00019331741958568565,
+        "PLA": 0.003919773557838655
+      },
+      "cross_scenario_year_min": {
+        "FEM": 0.015790025071159147,
+        "NFM": 0.11578237026323522,
+        "PCB": 0.0004585829141336646,
+        "PLA": 0.8512560086841641
+      },
+      "cross_scenario_year_max": {
+        "FEM": 0.03195344354252113,
+        "NFM": 0.12135160556350844,
+        "PCB": 0.0010081775100795453,
+        "PLA": 0.8623997864511987
+      },
+      "n_trajectories_evaluated": 97
+    },
+    "WEEE_Cat5": {
+      "category_id": "WEEE_Cat5",
+      "description": "Small Household & Consumer Equipment",
+      "mean": {
+        "FEM": 0.3951456438060238,
+        "NFM": 0.10071709518266721,
+        "PCB": 0.025901983068259228,
+        "PLA": 0.4782352779430497
+      },
+      "audit_ppm_2023_bau": {
+        "FEM_ppm": 395145.64,
+        "NFM_ppm": 100717.1,
+        "PCB_ppm": 25901.98,
+        "PLA_polymer_rest_ppm": 450880.54,
+        "OTHER_glass_ceramics_si_ppm": 27354.74,
+        "total_accounted_ppm": 1000000.0
+      },
+      "cross_scenario_year_std": {
+        "FEM": 0.013689593748804546,
+        "NFM": 0.007150928449786737,
+        "PCB": 0.004483636829228922,
+        "PLA": 0.015914161957056184
+      },
+      "cross_scenario_year_min": {
+        "FEM": 0.35819135686337306,
+        "NFM": 0.08783052761423783,
+        "PCB": 0.019994740198578186,
+        "PLA": 0.4687189723104669
+      },
+      "cross_scenario_year_max": {
+        "FEM": 0.40026931830696505,
+        "NFM": 0.11708271291176772,
+        "PCB": 0.03527358506036861,
+        "PLA": 0.5187045304620205
+      },
+      "n_trajectories_evaluated": 97
+    },
+    "WEEE_Cat6": {
+      "category_id": "WEEE_Cat6",
+      "description": "Small IT and Telecommunication Equipment",
+      "mean": {
+        "FEM": 0.3169060392287137,
+        "NFM": 0.02202751388656839,
+        "PCB": 0.08098328312510449,
+        "PLA": 0.5800831637596134
+      },
+      "audit_ppm_2023_bau": {
+        "FEM_ppm": 316906.04,
+        "NFM_ppm": 22027.51,
+        "PCB_ppm": 80983.28,
+        "PLA_polymer_rest_ppm": 559830.27,
+        "OTHER_glass_ceramics_si_ppm": 20252.89,
+        "total_accounted_ppm": 1000000.0
+      },
+      "cross_scenario_year_std": {
+        "FEM": 0.019849768432862007,
+        "NFM": 0.000587756848727919,
+        "PCB": 0.002547964415131847,
+        "PLA": 0.01810445361361111
+      },
+      "cross_scenario_year_min": {
+        "FEM": 0.2698870942872861,
+        "NFM": 0.01997785514195711,
+        "PCB": 0.07840346236349063,
+        "PLA": 0.5479110562594169
+      },
+      "cross_scenario_year_max": {
+        "FEM": 0.34774618341338837,
+        "NFM": 0.022785422558637664,
+        "PCB": 0.08677539509581746,
+        "PLA": 0.6217942925988628
+      },
+      "n_trajectories_evaluated": 97
+    }
+  },
+  "aliases": {
+    "Small IT Equipment": {
+      "FEM": 0.3169060392287137,
+      "NFM": 0.02202751388656839,
+      "PCB": 0.08098328312510449,
+      "PLA": 0.5800831637596134
+    },
+    "Large Household Appliances": {
+      "FEM": 0.5627563093729315,
+      "NFM": 0.043371809621913816,
+      "PCB": 0.005864941734717896,
+      "PLA": 0.38800693927043683
+    },
+    "Consumer Electronics": {
+      "FEM": 0.2338268151964926,
+      "NFM": 0.06336805555304946,
+      "PCB": 0.07341403904889879,
+      "PLA": 0.6293910902015591
+    },
+    "Cooling Appliances": {
+      "FEM": 0.5175455323154472,
+      "NFM": 0.08400991055450746,
+      "PCB": 0.001175391953035082,
+      "PLA": 0.3972691651770103
+    },
+    "Small Household Appliances": {
+      "FEM": 0.3951456438060238,
+      "NFM": 0.10071709518266721,
+      "PCB": 0.025901983068259228,
+      "PLA": 0.4782352779430497
+    },
+    "Lamps": {
+      "FEM": 0.0173097381291134,
+      "NFM": 0.3312083044630355,
+      "PCB": 0.08336333162573013,
+      "PLA": 0.5681186257821209
+    },
+    "Photovoltaic Panels": {
+      "FEM": 0.031269529322839336,
+      "NFM": 0.11601801839313466,
+      "PCB": 0.0009849228032894329,
+      "PLA": 0.8517275294807366
+    },
+    "standard": {
+      "FEM": 0.3951456438060238,
+      "NFM": 0.10071709518266721,
+      "PCB": 0.025901983068259228,
+      "PLA": 0.4782352779430497
+    }
+  }
+}
