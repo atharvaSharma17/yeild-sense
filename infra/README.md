@@ -60,6 +60,8 @@ Logs go to the service stack's `LogGroup` output and expire after 14 days. `Endp
 
 ## Remove compute
 
+For a failed initial Express Mode deployment in `ROLLBACK_FAILED` where CloudFormation removed the infrastructure role but left the service active, run `./infra/restore-failed-service-role.ps1 -StackName yieldsense-dev-service -Profile yieldsense-dev -Region ap-south-1`. It derives the original role and service identifiers from the failed stack, restores the managed Express policy plus the supplemental operations in `service.yaml`, and creates the ELB/autoscaling service-linked roles only if absent. It does not delete resources. After IAM propagation, delete the failed Express service with `aws ecs delete-express-gateway-service --service-arn <printed-arn> --profile yieldsense-dev --region ap-south-1 --monitor-resources RESOURCE --monitor-mode TEXT-ONLY`. Once that service and its managed infrastructure are removed, delete the failed service stack and wait for stack deletion. Remove the manually restored infrastructure role (detach the managed policy, delete its `ExpressDeploymentOperations` inline policy, then delete the role); do not remove the shared service-linked roles. Keep the storage stack and rerun deployment. If AWS again returns an unspecified `CreateLoadBalancer` AccessDenied, investigate the account restriction with AWS Support rather than granting broad IAM permissions.
+
 Delete the service stack first; it imports the storage stack's exports:
 
 ```powershell

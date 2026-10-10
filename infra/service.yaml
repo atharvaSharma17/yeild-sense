@@ -199,6 +199,22 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices'
+      # These calls were denied during an Express Mode deployment despite the
+      # managed policy being attached. Keep the supplemental access scoped.
+      Policies:
+        - PolicyName: ExpressDeploymentOperations
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ec2:DescribeAccountAttributes
+                Resource: '*'
+              - Effect: Allow
+                Action: [ecs:DescribeServices, ecs:UpdateService]
+                Resource: !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/${Cluster}/${AWS::StackName}-api'
+              - Effect: Allow
+                Action: cloudwatch:DescribeAlarms
+                Resource: !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:*'
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
