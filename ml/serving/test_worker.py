@@ -4,9 +4,17 @@ import hashlib
 import io
 import json
 import os
+from pathlib import Path
+import sys
 import tarfile
 import unittest
 from unittest.mock import patch
+
+_CURRENT_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _CURRENT_DIR.parent.parent
+for p in (str(_CURRENT_DIR), str(_PROJECT_ROOT)):
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from PIL import Image
 import torch

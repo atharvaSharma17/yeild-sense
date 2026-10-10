@@ -1,0 +1,65 @@
+{
+  "n_replications": 30,
+  "lots_per_replication": 20,
+  "calibration_scenarios": 13,
+  "held_out_evaluation_scenarios": 31,
+  "policies": {
+    "FIXED_ROUTE": {
+      "mean_expected_profit_inr": 6974.13,
+      "ci95_expected_profit_inr": 3627.97,
+      "mean_worst_scenario_profit_inr": -48437.76,
+      "mean_cvar80_profit_inr": -32732.61,
+      "mean_regret_inr": 48524.5,
+      "mean_worst_case_regret_inr": 63702.8,
+      "mean_capacity_exceedance_kg": 0.0,
+      "solver_p50_ms": 1.0,
+      "solver_p95_ms": 1.0
+    },
+    "MEAN_GREEDY": {
+      "mean_expected_profit_inr": 45303.79,
+      "ci95_expected_profit_inr": 1986.13,
+      "mean_worst_scenario_profit_inr": -9081.57,
+      "mean_cvar80_profit_inr": 5550.8,
+      "mean_regret_inr": 10194.84,
+      "mean_worst_case_regret_inr": 25392.06,
+      "mean_capacity_exceedance_kg": 0.0,
+      "solver_p50_ms": 1.0,
+      "solver_p95_ms": 1.0
+    },
+    "EXPECTED": {
+      "mean_expected_profit_inr": 48688.89,
+      "ci95_expected_profit_inr": 1412.45,
+      "mean_worst_scenario_profit_inr": 7991.91,
+      "mean_cvar80_profit_inr": 21345.07,
+      "mean_regret_inr": 6809.74,
+      "mean_worst_case_regret_inr": 27879.27,
+      "mean_capacity_exceedance_kg": 0.0,
+      "solver_p50_ms": 22.5,
+      "solver_p95_ms": 71.2
+    },
+    "ROBUST": {
+      "mean_expected_profit_inr": 44970.54,
+      "ci95_expected_profit_inr": 1339.34,
+      "mean_worst_scenario_profit_inr": 13494.26,
+      "mean_cvar80_profit_inr": 24687.22,
+      "mean_regret_inr": 10528.09,
+      "mean_worst_case_regret_inr": 41734.59,
+      "mean_capacity_exceedance_kg": 0.0,
+      "solver_p50_ms": 31.0,
+      "solver_p95_ms": 142.45
+    },
+    "CVAR": {
+      "mean_expected_profit_inr": 45371.51,
+      "ci95_expected_profit_inr": 1238.43,
+      "mean_worst_scenario_profit_inr": 13431.87,
+      "mean_cvar80_profit_inr": 24753.13,
+      "mean_regret_inr": 10127.12,
+      "mean_worst_case_regret_inr": 40831.6,
+      "mean_capacity_exceedance_kg": 0.0,
+      "solver_p50_ms": 37.5,
+      "solver_p95_ms": 140.05
+    }
+  },
+  "robust_worst_case_regret_reduction_vs_greedy_pct": -64.36,
+  "cvar_worst_case_regret_reduction_vs_greedy_pct": -60.8
+}

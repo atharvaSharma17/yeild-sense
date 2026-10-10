@@ -1,0 +1,211 @@
+{
+  "pipeline": "Track A TU Darmstadt RGB-MFCO Particle Composition & Mass Regression",
+  "training_dataset": {
+    "name": "TU Darmstadt WEEE RGB-MFCO DS2",
+    "source_zip": "RGB-MFCO-dataset-v1.0.0.zip",
+    "paired_particles_count": 1976,
+    "classes": [
+      "FEM",
+      "NFM",
+      "PCB",
+      "PLA"
+    ]
+  },
+  "evaluation_dataset": {
+    "name": "TU Darmstadt WEEE RGB-MFCO DS3 (Mixed Batches MS1, MS2, MS3)",
+    "total_mixed_particles": 2789
+  },
+  "ds2_cross_validation": {
+    "classification_accuracy": 0.8426,
+    "classification_macro_f1": 0.8423,
+    "mass_regression_mae_g": 1.8552,
+    "mass_regression_r2": 0.5629
+  },
+  "ds3_mixed_batch_validation": {
+    "batches": {
+      "MS1": {
+        "num_particles": 559,
+        "weighbridge_mass_kg": 2.003,
+        "raw_visual_mass_kg": 2.1015,
+        "visual_to_scale_ratio": 1.0492,
+        "predicted_fractions": {
+          "FEM": 0.3168,
+          "NFM": 0.283,
+          "PCB": 0.2056,
+          "PLA": 0.1946
+        },
+        "ground_truth_fractions": {
+          "FEM": 0.2993,
+          "NFM": 0.3,
+          "PCB": 0.2,
+          "PLA": 0.2007
+        },
+        "composition_mae": 0.0116,
+        "class_errors": {
+          "FEM": 0.0176,
+          "NFM": 0.017,
+          "PCB": 0.0056,
+          "PLA": 0.0061
+        },
+        "scenarios": [
+          {
+            "FEM": 0.3168,
+            "NFM": 0.283,
+            "PCB": 0.2056,
+            "PLA": 0.1946
+          },
+          {
+            "FEM": 0.3272,
+            "NFM": 0.2768,
+            "PCB": 0.2104,
+            "PLA": 0.1856
+          },
+          {
+            "FEM": 0.3313,
+            "NFM": 0.2965,
+            "PCB": 0.19,
+            "PLA": 0.1822
+          },
+          {
+            "FEM": 0.3535,
+            "NFM": 0.2606,
+            "PCB": 0.2159,
+            "PLA": 0.17
+          },
+          {
+            "FEM": 0.3048,
+            "NFM": 0.2891,
+            "PCB": 0.2263,
+            "PLA": 0.1798
+          }
+        ]
+      },
+      "MS2": {
+        "num_particles": 1267,
+        "weighbridge_mass_kg": 4.0062,
+        "raw_visual_mass_kg": 4.1206,
+        "visual_to_scale_ratio": 1.0285,
+        "predicted_fractions": {
+          "FEM": 0.4324,
+          "NFM": 0.1843,
+          "PCB": 0.1099,
+          "PLA": 0.2733
+        },
+        "ground_truth_fractions": {
+          "FEM": 0.4497,
+          "NFM": 0.1495,
+          "PCB": 0.1014,
+          "PLA": 0.2994
+        },
+        "composition_mae": 0.0217,
+        "class_errors": {
+          "FEM": 0.0173,
+          "NFM": 0.0348,
+          "PCB": 0.0085,
+          "PLA": 0.0261
+        },
+        "scenarios": [
+          {
+            "FEM": 0.4324,
+            "NFM": 0.1843,
+            "PCB": 0.1099,
+            "PLA": 0.2733
+          },
+          {
+            "FEM": 0.4541,
+            "NFM": 0.1816,
+            "PCB": 0.0924,
+            "PLA": 0.2719
+          },
+          {
+            "FEM": 0.4516,
+            "NFM": 0.1894,
+            "PCB": 0.0899,
+            "PLA": 0.2691
+          },
+          {
+            "FEM": 0.4755,
+            "NFM": 0.1677,
+            "PCB": 0.1133,
+            "PLA": 0.2434
+          },
+          {
+            "FEM": 0.4436,
+            "NFM": 0.1995,
+            "PCB": 0.1011,
+            "PLA": 0.2558
+          }
+        ]
+      },
+      "MS3": {
+        "num_particles": 963,
+        "weighbridge_mass_kg": 4.0018,
+        "raw_visual_mass_kg": 4.2562,
+        "visual_to_scale_ratio": 1.0636,
+        "predicted_fractions": {
+          "FEM": 0.2438,
+          "NFM": 0.3796,
+          "PCB": 0.2698,
+          "PLA": 0.1069
+        },
+        "ground_truth_fractions": {
+          "FEM": 0.1514,
+          "NFM": 0.4509,
+          "PCB": 0.2978,
+          "PLA": 0.1
+        },
+        "composition_mae": 0.0497,
+        "class_errors": {
+          "FEM": 0.0924,
+          "NFM": 0.0713,
+          "PCB": 0.028,
+          "PLA": 0.0069
+        },
+        "scenarios": [
+          {
+            "FEM": 0.2438,
+            "NFM": 0.3796,
+            "PCB": 0.2698,
+            "PLA": 0.1069
+          },
+          {
+            "FEM": 0.2298,
+            "NFM": 0.3909,
+            "PCB": 0.274,
+            "PLA": 0.1052
+          },
+          {
+            "FEM": 0.2276,
+            "NFM": 0.368,
+            "PCB": 0.2959,
+            "PLA": 0.1085
+          },
+          {
+            "FEM": 0.2391,
+            "NFM": 0.3523,
+            "PCB": 0.2999,
+            "PLA": 0.1088
+          },
+          {
+            "FEM": 0.2524,
+            "NFM": 0.4086,
+            "PCB": 0.244,
+            "PLA": 0.095
+          }
+        ]
+      }
+    },
+    "mean_composition_mae": 0.0276
+  },
+  "summary_metrics": {
+    "particle_mass_mae_g": 1.8552,
+    "particle_mass_r2": 0.5629,
+    "classification_accuracy": 0.8426,
+    "classification_macro_f1": 0.8423,
+    "mixed_batch_composition_mae": 0.0276,
+    "ms1_composition_mae": 0.0116,
+    "ms2_composition_mae": 0.0217,
+    "ms3_composition_mae": 0.0497
+  },
+  "duration_seconds": 14.67
+}
