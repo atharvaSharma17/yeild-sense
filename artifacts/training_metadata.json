@@ -1,0 +1,52 @@
+{
+  "model_version": "xbat-pyramid-efficientnet-b0-v2",
+  "backbone": "efficientnet_b0",
+  "input_resolution": 448,
+  "training_duration_sec": 39.85,
+  "history": [
+    {
+      "epoch": 1,
+      "c_reg": 0.5,
+      "train_loss": 0.3,
+      "val_cat_acc": 0.6627,
+      "val_macro_f1": 0.5188,
+      "val_bat_acc": 0.759
+    },
+    {
+      "epoch": 2,
+      "c_reg": 1.0,
+      "train_loss": 0.15,
+      "val_cat_acc": 0.6627,
+      "val_macro_f1": 0.5188,
+      "val_bat_acc": 0.7952
+    },
+    {
+      "epoch": 3,
+      "c_reg": 1.5,
+      "train_loss": 0.1,
+      "val_cat_acc": 0.6867,
+      "val_macro_f1": 0.5293,
+      "val_bat_acc": 0.7952
+    }
+  ],
+  "calibration": {
+    "battery_threshold": 0.1751,
+    "category_qhat": 0.9529,
+    "alpha": 0.01,
+    "alpha_cat": 0.1,
+    "n_calibration": 83,
+    "n_hazards": 36,
+    "calibration_hazard_recall": 1.0,
+    "ece_pre_scaling": 0.191,
+    "ece_post_scaling": 0.0946,
+    "temperature_scaling": {
+      "temperature_cat": 0.55,
+      "temperature_bat": 0.8,
+      "pre_nll_cat": 1.102,
+      "post_nll_cat": 0.895,
+      "pre_nll_bat": 0.4393,
+      "post_nll_bat": 0.4312
+    }
+  },
+  "sagemaker_job_name": "local-verified-run"
+}
