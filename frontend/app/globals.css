@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-space-grotesk: "Space Grotesk";
+  --font-dm-sans: "DM Sans";
+  --font-plex-mono: "IBM Plex Mono";
+  --font-newsreader: "Newsreader";
+  --paper: #f6f1e7;
+  --ivory: #fffdf8;
+  --ink: #18211b;
+  --sage: #aebca5;
+  --moss: #466050;
+  --clay: #a95e3f;
+  --straw: #d9c789;
+  --mist: #e8e5dc;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-dm-sans), Arial, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: var(--sage); color: var(--ink); }
+
+:focus-visible {
+  outline: 3px solid var(--clay);
+  outline-offset: 4px;
+}
+
+.paper-grain {
+  background-image: radial-gradient(rgba(24, 33, 27, 0.08) 0.65px, transparent 0.65px);
+  background-size: 9px 9px;
+}
+
+.rule { border-color: rgba(24, 33, 27, 0.22); }
+
+.input {
+  width: 100%;
+  border: 1px solid rgba(24, 33, 27, 0.55);
+  background: var(--ivory);
+  padding: 0.55rem 0.65rem;
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+.input:focus { border-color: var(--ink); box-shadow: 2px 2px 0 var(--clay); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
