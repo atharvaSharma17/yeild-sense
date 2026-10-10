@@ -1,0 +1,57 @@
+{
+  "model_version": "xbat-dualhead-pyramid-v2",
+  "track": "B",
+  "task": "device_classification",
+  "architecture": "dualhead_efficientnet_b0",
+  "artifact_s3_uri": "s3://yieldsense-storage-ap-south-1/models/model.tar.gz",
+  "artifact_sha256": "9cb1d9c519d28fc7617429320374acfcf8befb2c2d8a0405f439420e27e81588",
+  "dataset_manifest_sha256": "cef024f232c58335921b07e15c7160ddd9868f691a3b53aae913971399998954",
+  "data_version": "xbat-v1.0-futuram-v14.2",
+  "training_job_arn": "arn:aws:sagemaker:ap-south-1:123456789012:training-job/yieldsense-xbat-dualhead-pyramid-v2",
+  "labels": [
+    "AlarmClock",
+    "ComputerMouse",
+    "E-Razor",
+    "E-Toothbrush",
+    "FireAlarm",
+    "FlashLight",
+    "GameController",
+    "iPad",
+    "KidToy",
+    "MobilePhone",
+    "NewsRadio",
+    "NightTorch",
+    "PhotoCamera",
+    "RemoteControl",
+    "Thermometer"
+  ],
+  "preprocessing": {
+    "width": 224,
+    "height": 224,
+    "color_mode": "RGB",
+    "scale": 0.00392156862745098,
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "confidence_threshold": 0.45,
+  "evaluation": {
+    "macro_f1": 0.5322,
+    "accuracy": 0.7692,
+    "conformal_hazard_recall": 1.0
+  },
+  "battery_review_labels": [
+    "AlarmClock",
+    "FireAlarm",
+    "MobilePhone",
+    "NewsRadio"
+  ],
+  "conformal_battery_threshold": 0.174
+}
