@@ -161,7 +161,7 @@ YieldSense utilizes the official TU Darmstadt WEEE particle benchmark:
 
 ### 4.2 Domain-Specific Analytical Feature Extraction ([`ml/track_a/features.py`](track_a/features.py))
 Instead of training heavy segmentation CNNs, Track A computes 16 analytical shape and spectral reflectance moments in microseconds:
-* **Morphological Invariants:** Projected area ($\text{area\_px}$), bounding box aspect ratio, fill ratio.
+* **Morphological Invariants:** Projected area (`area_px`), bounding box aspect ratio, fill ratio.
 * **Foreground Color Moments:** Mean and standard deviation of foreground $R, G, B$ pixels (excluding near-black conveyor background).
 * **Spectral Ratio Descriptors:**
   * **PCB Solder Mask Signature:** $\text{Ratio}_{\text{G/R}} = \frac{\mu_{\text{fg, G}}}{\max(\mu_{\text{fg, R}}, 10^{-4})}$. High green relative to red uniquely isolates printed circuit board fragments.
@@ -295,7 +295,7 @@ The HTTP inference sidecar in [`ml/serving/worker.py`](serving/worker.py) serves
   ]
 }
 ```
-* **Strict Scenario[0] Identity:** Scenario 0 is mathematically identical to $\frac{\text{material\_mass\_kg}}{\sum \text{material\_mass\_kg}}$ within $10^{-6}$, satisfying the Go backend's [`Assess()`](file:///c:/Users/Ashutosh/Downloads/AWS-HACK/yeild-sense/backend/internal/inference/contract.go#L251) requirement.
+* **Strict Scenario[0] Identity:** Scenario 0 is mathematically identical to normalized material mass fractions $\frac{M_k}{\sum_j M_j}$ (corresponding to `material_mass_kg`) within $10^{-6}$, satisfying the Go backend's [`Assess()`](file:///c:/Users/Ashutosh/Downloads/AWS-HACK/yeild-sense/backend/internal/inference/contract.go#L251) requirement.
 
 ---
 
