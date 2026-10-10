@@ -55,7 +55,7 @@ def evaluate_model(
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
 
-    ds = DualHeadWEEEDataset(test_csv, category_to_idx, tf)
+    ds = DualHeadWEEEDataset(test_csv, category_to_idx, tf, root_dir=test_csv.parent)
     loader = DataLoader(ds, batch_size=32, shuffle=False)
 
     model = DualHeadEfficientNet(
@@ -69,7 +69,12 @@ def evaluate_model(
     model.eval()
 
     cal_data = np.load(model_dir / "calibration_scores.npz")
-    bat_threshold = float(cal_data["battery_threshold"])
+    if "conformal_battery_threshold" in cal_data:
+        bat_threshold = float(cal_data["conformal_battery_threshold"])
+    elif "battery_threshold" in cal_data:
+        bat_threshold = float(cal_data["battery_threshold"])
+    else:
+        bat_threshold = 0.1751
     cat_qhat = float(cal_data["category_qhat"]) if "category_qhat" in cal_data else 0.85
     alpha = float(cal_data["alpha"]) if "alpha" in cal_data else 0.01
 

@@ -21,7 +21,7 @@ import sys
 import time
 import numpy as np
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, log_loss
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -63,7 +63,8 @@ def parse_args():
         type=str,
         default=os.environ.get("SM_CHANNEL_VALIDATION", "data/processed"),
     )
-    return parser.parse_args()
+    args, _ = parser.parse_known_args()
+    return args
 
 
 def _extract_cached_features(
@@ -199,11 +200,14 @@ def train() -> dict:
         )
         val_bat_acc = round(float(np.mean(val_bat_preds == y_val_bat)), 4)
 
-        score = 0.50 * val_cat_acc + 0.35 * val_macro_f1 + 0.15 * val_bat_acc + (0.01 if c_cand == 1.0 else 0.0)
+        tr_cat_probs = cat_clf.predict_proba(X_tr)
+        actual_loss = round(float(log_loss(y_tr_cat, tr_cat_probs, labels=np.arange(len(categories)))), 4)
+
+        score = round(0.50 * val_cat_acc + 0.35 * val_macro_f1 + 0.15 * val_bat_acc, 4)
         metrics = {
             "epoch": idx_e + 1,
             "c_reg": c_cand,
-            "train_loss": round(0.15 / c_cand, 4),
+            "train_loss": actual_loss,
             "val_cat_acc": val_cat_acc,
             "val_macro_f1": val_macro_f1,
             "val_bat_acc": val_bat_acc,
@@ -211,7 +215,7 @@ def train() -> dict:
         history.append(metrics)
         print(json.dumps(metrics))
 
-        if c_cand == 1.0 or best_score < 0:
+        if score > best_score:
             best_score = score
             _set_linear_heads_from_sklearn(model, cat_clf, bat_clf, device)
             torch.save(model.state_dict(), model_dir / "model.pth")

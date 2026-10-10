@@ -67,7 +67,12 @@ class TriageEngine:
         cal_file = self.artifact_dir / "calibration_scores.npz"
         if cal_file.exists():
             cal_data = np.load(cal_file)
-            self.battery_threshold = float(cal_data["battery_threshold"])
+            if "conformal_battery_threshold" in cal_data:
+                self.battery_threshold = float(cal_data["conformal_battery_threshold"])
+            elif "battery_threshold" in cal_data:
+                self.battery_threshold = float(cal_data["battery_threshold"])
+            else:
+                self.battery_threshold = 0.1751
             self.category_qhat = (
                 float(cal_data["category_qhat"])
                 if "category_qhat" in cal_data
@@ -75,7 +80,7 @@ class TriageEngine:
             )
             self.alpha = float(cal_data["alpha"]) if "alpha" in cal_data else 0.01
         else:
-            self.battery_threshold = 0.25
+            self.battery_threshold = 0.1751
             self.category_qhat = 0.85
             self.alpha = 0.01
 

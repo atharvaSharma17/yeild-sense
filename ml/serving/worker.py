@@ -48,7 +48,10 @@ def _load_raw_artifact(uri_str: str, expected_sha256: str) -> bytes:
     
     # 1. Local file path support (file:// or plain filesystem path)
     if uri.scheme in ("", "file"):
-        local_path = Path(uri.path if uri.scheme == "file" else uri_str)
+        path_str = uri.path if uri.scheme == "file" else uri_str
+        if os.name == "nt" and uri.scheme == "file" and path_str.startswith("/") and len(path_str) > 2 and path_str[2] == ":":
+            path_str = path_str[1:]
+        local_path = Path(path_str)
         if not local_path.is_file():
             # Check relative to artifacts/ if not found
             alt_path = _PROJECT_ROOT / "artifacts" / local_path.name
@@ -210,7 +213,12 @@ def predict(payload):
 
             # Split Conformal Risk Control Battery Hazard Gating
             # Bounded false negative rate strictly below alpha = 0.01
-            tau = float(manifest.get("conformal_battery_threshold", bundle["calibration"].get("conformal_battery_threshold", 0.174)))
+            cal_dict = bundle.get("calibration", {})
+            tau = float(
+                manifest.get("conformal_battery_threshold",
+                             cal_dict.get("conformal_battery_threshold",
+                                          cal_dict.get("battery_threshold", 0.1751)))
+            )
             if p_bat >= tau:
                 battery_alert = "suspected"
             else:
@@ -240,15 +248,55 @@ def predict(payload):
         
         # Canonical baseline priors from FutuRaM WEEE profiles
         base_fractions = {"FEM": 0.4820, "NFM": 0.1240, "PCB": 0.0910, "PLA": 0.2810, "OTHER": 0.0220}
+        
+        # Vision-guided adjustment from shredded particle intake image
+        if array is not None:
+            # Color-space analysis: PCB exhibits high green relative to red/blue
+            # Ferrous/metallic particles exhibit higher overall gray reflectivity
+            mean_intensity = float(np.mean(array))
+            mean_green = float(np.mean(array[:, :, 1]))
+            mean_red = float(np.mean(array[:, :, 0]))
+
+            pcb_adj = 0.020 if mean_green > (mean_red * 1.05) else -0.010
+            fem_adj = 0.025 if mean_intensity > 130.0 else -0.015
+
+            adjusted = {
+                "FEM": max(0.05, base_fractions["FEM"] + fem_adj),
+                "NFM": base_fractions["NFM"],
+                "PCB": max(0.02, base_fractions["PCB"] + pcb_adj),
+                "PLA": base_fractions["PLA"],
+                "OTHER": base_fractions["OTHER"],
+            }
+            tot_adj = sum(adjusted.values())
+            base_fractions = {k: adjusted[k] / tot_adj for k in materials}
+
         material_mass = {k: round(base_fractions[k] * mass_kg, 4) for k in materials}
         
         # Scenario 0 must match normalized predicted masses strictly within 1e-6
         total_est_mass = sum(material_mass.values())
         scen_0 = {k: material_mass[k] / total_est_mass for k in materials}
         
-        # Generate 3 aligned joint scenarios
-        scen_1 = {"FEM": 0.4400, "NFM": 0.1500, "PCB": 0.1100, "PLA": 0.2800, "OTHER": 0.0200}
-        scen_2 = {"FEM": 0.5200, "NFM": 0.1000, "PCB": 0.0700, "PLA": 0.2850, "OTHER": 0.0250}
+        # Generate 3 aligned joint scenarios spanning expected process variance
+        scen_1 = {
+            "FEM": scen_0["FEM"] * 0.94,
+            "NFM": scen_0["NFM"] * 1.15,
+            "PCB": scen_0["PCB"] * 1.12,
+            "PLA": scen_0["PLA"] * 0.98,
+            "OTHER": scen_0["OTHER"],
+        }
+        tot_1 = sum(scen_1.values())
+        scen_1 = {k: scen_1[k] / tot_1 for k in materials}
+
+        scen_2 = {
+            "FEM": scen_0["FEM"] * 1.06,
+            "NFM": scen_0["NFM"] * 0.88,
+            "PCB": scen_0["PCB"] * 0.85,
+            "PLA": scen_0["PLA"] * 1.02,
+            "OTHER": scen_0["OTHER"],
+        }
+        tot_2 = sum(scen_2.values())
+        scen_2 = {k: scen_2[k] / tot_2 for k in materials}
+
         scenarios = [scen_0, scen_1, scen_2]
 
         return {

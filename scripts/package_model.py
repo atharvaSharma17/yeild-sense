@@ -50,9 +50,19 @@ def package_model(
     if cal_json.exists():
         with open(cal_json, "r", encoding="utf-8") as f:
             cal_data = json.load(f)
-            conformal_tau = float(cal_data.get("conformal_battery_threshold", conformal_tau))
-            temp_cat = float(cal_data.get("temperature_cat", temp_cat))
-            temp_bat = float(cal_data.get("temperature_bat", temp_bat))
+            conformal_tau = float(
+                cal_data.get("conformal_battery_threshold",
+                             cal_data.get("battery_threshold", conformal_tau))
+            )
+            temp_scale = cal_data.get("temperature_scaling", {})
+            temp_cat = float(
+                cal_data.get("temperature_cat",
+                             temp_scale.get("temperature_cat", temp_cat))
+            )
+            temp_bat = float(
+                cal_data.get("temperature_bat",
+                             temp_scale.get("temperature_bat", temp_bat))
+            )
 
     # Compute dataset manifest sha256
     train_csv = data_dir / "train.csv"
@@ -100,12 +110,18 @@ def package_model(
     archive_bytes = tar_path.read_bytes()
     archive_sha256 = hashlib.sha256(archive_bytes).hexdigest()
 
-    high_risk_labels = [
-        lbl for lbl in labels
-        if any(w in lbl.lower() for w in ["phone", "laptop", "tablet", "alarm", "transceiver", "radio", "smoke"])
-    ]
+    high_risk_lithium = frozenset({
+        "E-Razor",
+        "E-Toothbrush",
+        "GameController",
+        "iPad",
+        "MobilePhone",
+        "PhotoCamera",
+    })
+    high_risk_labels = [lbl for lbl in labels if lbl in high_risk_lithium]
 
     manifest = {
+        "contract_version": "1",
         "model_version": "xbat-dualhead-pyramid-v2",
         "track": "B",
         "task": "device_classification",
@@ -117,8 +133,8 @@ def package_model(
         "training_job_arn": f"arn:aws:sagemaker:{region}:{account_id}:training-job/{job_name}",
         "labels": labels,
         "preprocessing": {
-            "width": 224,
-            "height": 224,
+            "width": 448,
+            "height": 448,
             "color_mode": "RGB",
             "scale": 1.0 / 255.0,
             "mean": [0.485, 0.456, 0.406],

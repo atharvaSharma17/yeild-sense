@@ -168,9 +168,9 @@ def build_and_split_xbat(
     full_train_df = pd.DataFrame(train_records)
     test_df = pd.DataFrame(test_records)
 
-    # Stratified split on (category) while respecting device_id uniqueness
-    skf = StratifiedKFold(n_splits=4, shuffle=True, random_state=seed)
-    train_idx, cal_idx = next(skf.split(full_train_df, full_train_df["category"]))
+    # Group split on device_id to guarantee zero multi-view device leakage
+    gss = GroupShuffleSplit(n_splits=1, test_size=0.25, random_state=seed)
+    train_idx, cal_idx = next(gss.split(full_train_df, full_train_df["category"], groups=full_train_df["device_id"]))
     train_df = full_train_df.iloc[train_idx].copy().reset_index(drop=True)
     cal_df = full_train_df.iloc[cal_idx].copy().reset_index(drop=True)
 

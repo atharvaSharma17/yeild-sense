@@ -90,8 +90,8 @@ Evaluated on the locked 91-image held-out test split:
 
 | Metric | Baseline ResNet-18 (1-Crop) | 2-Stage Unfreeze | **DualHeadEfficientNet v2 (3-Scale Pyramid)** |
 |---|---:|---:|---:|
-| **Top-1 Category Accuracy** | 57.14% | 68.13% | **79.12%** (+10.99%) |
-| **Macro F1** | 0.3580 | 0.4681 | **0.5808** (+24.1%) |
+| **Top-1 Category Accuracy** | 57.14% | 68.13% | **78.02%** (+20.88%) |
+| **Macro F1** | 0.3580 | 0.4681 | **0.5346** (+17.66%) |
 | **Battery Hazard ROC-AUC** | 0.8570 | 0.9221 | **0.9408** |
 | **Conformal Hazard Recall ($\alpha=0.01$)** | 100.0% (39/39) | 100.0% (39/39) | **100.0% (39/39)** |
 | **Calibration ECE (Post)** | 0.1205 | 0.1143 | **0.0761** |
@@ -126,7 +126,7 @@ python scripts/split_xbat.py
 python scripts/transform_futuram.py
 
 # 2. Train and calibrate (CPU, <35s)
-python ml/train.py --data_dir data/processed --out_dir artifacts
+python ml/train.py --train_dir data/processed --val_dir data/processed --model_dir artifacts
 
 # 3. Evaluate held-out test performance
 python ml/evaluate.py --model_dir artifacts --test_csv data/processed/test.csv
@@ -135,5 +135,6 @@ python ml/evaluate.py --model_dir artifacts --test_csv data/processed/test.csv
 python scripts/package_model.py
 
 # 5. Run serving and contract integration tests
-python -m unittest discover -s ml/serving -p "test_*.py" -v
+python -m unittest ml/serving/test_dualhead_worker.py
+$env:PYTHONPATH="ml/serving"; python -m unittest ml/serving/test_worker.py
 ```

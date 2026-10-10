@@ -100,7 +100,7 @@ FUTURAM_PRIORS: Dict[str, Dict[str, float]] = load_futuram_priors()
 
 def get_category_prior(category: str) -> Dict[str, float]:
     """Retrieve the normalized 4-class composition prior for `category`."""
-    priors = load_futuram_priors()
+    priors = FUTURAM_PRIORS
     if category in priors:
         return dict(priors[category])
     if category in XBAT_CLASS_TO_WEEE_CAT:
@@ -128,7 +128,7 @@ def generate_scenarios(
     seed: int = 42,
     include_stress: bool = False,
 ) -> List[Dict[str, float]]:
-    """Generate `n` Dirichlet composition scenarios anchored at `mean` (total `n + 1` with mean)."""
+    """Generate exactly `n` Dirichlet composition scenarios anchored at `mean` (mean is Scenario 0)."""
     if set(mean.keys()) != set(CLASSES):
         raise ValueError(f"Composition must contain exact keys {CLASSES}")
     vec = np.array([float(mean[c]) for c in CLASSES], dtype=np.float64)
@@ -141,7 +141,7 @@ def generate_scenarios(
     alpha = np.maximum(np.array([clean_mean[c] for c in CLASSES]), 1e-6) * float(concentration)
     rng = np.random.default_rng(seed)
 
-    n_random = max(0, n - 1) if (include_stress and n >= 2) else n
+    n_random = max(0, n - 2) if (include_stress and n >= 2) else max(0, n - 1)
     draws = rng.dirichlet(alpha, size=n_random) if n_random > 0 else np.empty((0, len(CLASSES)))
 
     scenarios: List[Dict[str, float]] = [clean_mean]

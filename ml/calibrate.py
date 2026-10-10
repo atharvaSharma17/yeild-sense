@@ -148,6 +148,7 @@ def run_calibration(
     np.savez(
         cal_artifact,
         battery_threshold=calibrated_threshold,
+        conformal_battery_threshold=calibrated_threshold,
         category_qhat=cat_qhat,
         alpha=alpha,
         alpha_cat=alpha_cat,
@@ -159,6 +160,9 @@ def run_calibration(
 
     summary = {
         "battery_threshold": round(calibrated_threshold, 4),
+        "conformal_battery_threshold": round(calibrated_threshold, 4),
+        "temperature_cat": temp_info.get("temperature_cat", 1.0),
+        "temperature_bat": temp_info.get("temperature_bat", 1.0),
         "category_qhat": round(cat_qhat, 4),
         "alpha": alpha,
         "alpha_cat": alpha_cat,

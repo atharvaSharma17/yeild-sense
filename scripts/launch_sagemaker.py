@@ -25,7 +25,6 @@ def run(dry_run: bool = False) -> dict:
 
     hyperparameters = {
         "epochs": int(os.environ.get("SM_EPOCHS", "8")),
-        "warmup_epochs": 2,
         "batch_size": 32,
         "lr": 1.5e-3,
         "battery_weight": 2.0,
