@@ -43,7 +43,7 @@ Let $\mathcal{D}_{\text{cal}} = \{(x_i, y_{\text{bat}, i})\}_{i=1}^n$ be a held-
 
 $$\hat{\tau} = 1 - \text{Quantile}\left(\{S_i\}_{i: y_{\text{bat}, i}=1}, \frac{\lceil (n_{\text{haz}} + 1)(1 - \alpha) \rceil}{n_{\text{haz}}}\right)$$
 
-* **Calibrated Threshold:** $\hat{\tau}_{\text{bat}} = 0.174$
+* **Calibrated Threshold:** $\hat{\tau}_{\text{bat}} = 0.1744$
 * **Safety Rule:** Any sample with $p_{\text{bat}}(x) \ge \hat{\tau}_{\text{bat}}$ emits `battery_alert: "suspected"`, which the Go backend uses to automatically divert the lot to quarantine hold.
 * **Held-Out Test Result:** **100% Hazard Recall (39/39 hazards caught, 0 missed)**.
 
