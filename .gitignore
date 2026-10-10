@@ -49,6 +49,7 @@ data/processed/res_XBAT*
 *.pt
 *.bin
 *.onnx
+*.joblib
 
 # OS & IDE
 .DS_Store

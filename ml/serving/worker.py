@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 import boto3
 from botocore.config import Config
+import joblib
 import numpy as np
 from PIL import Image
 import torch
@@ -31,6 +32,15 @@ try:
     from ml.model import DualHeadEfficientNet
 except ImportError:
     DualHeadEfficientNet = None
+
+try:
+    from ml.track_a.features import extract_particle_classifier_features, extract_particle_features
+    from ml.track_a.mass_regression import ParticleMassRegressor, ParticleMaterialClassifier
+except ImportError:
+    extract_particle_classifier_features = None
+    extract_particle_features = None
+    ParticleMassRegressor = None
+    ParticleMaterialClassifier = None
 
 torch.set_num_threads(1)
 Image.MAX_IMAGE_PIXELS = 16_000_000
@@ -90,12 +100,15 @@ def artifact_model(manifest):
     track = manifest.get("track", "")
 
     # Supported architectures
-    supported_archs = ("resnet18", "dualhead_efficientnet_b0", "efficientnet_b0")
+    supported_archs = ("resnet18", "dualhead_efficientnet_b0", "efficientnet_b0", "gbr_particle_mass_regressor")
     if arch not in supported_archs:
         raise ValueError(f"Architecture '{arch}' not supported. Expected one of {supported_archs}")
     
     if arch == "resnet18" and (track != "B" or task != "device_classification"):
         raise ValueError("This worker supports the Track B ResNet-18 classifier only")
+
+    if arch == "gbr_particle_mass_regressor" and (track != "A" or task != "particle_composition"):
+        raise ValueError("This model supports Track A particle composition only")
 
     if task not in ("device_classification", "particle_composition"):
         raise ValueError(f"Task '{task}' not supported.")
@@ -119,9 +132,10 @@ def artifact_model(manifest):
                 if index > 1000:
                     raise ValueError("Too many archive entries")
                 name = member.name.removeprefix("./")
-                if name not in ("model.pth", "labels.json", "calibration.json"):
+                if name not in ("model.pth", "labels.json", "calibration.json", "classifier.joblib", "regressor.joblib", "evaluation.json"):
                     continue
-                if name in found or not member.isfile() or member.size > (100 * 1024 * 1024 if name == "model.pth" else 65536):
+                max_size = 100 * 1024 * 1024 if name in ("model.pth", "classifier.joblib", "regressor.joblib") else 65536
+                if name in found or not member.isfile() or member.size > max_size:
                     raise ValueError("Invalid model archive member")
                 found[name] = archive.extractfile(member).read()
 
@@ -161,6 +175,26 @@ def artifact_model(manifest):
             model.eval()
             bundle = {"type": "dualhead_efficientnet", "model": model, "labels": labels, "calibration": calibration_info}
 
+        elif arch == "gbr_particle_mass_regressor":
+            clf = None
+            reg = None
+            if "classifier.joblib" in found and ParticleMaterialClassifier is not None:
+                clf_data = joblib.load(io.BytesIO(found["classifier.joblib"]))
+                clf = ParticleMaterialClassifier()
+                clf.model = clf_data["model"]
+                clf.classes = tuple(clf_data["classes"])
+            if "regressor.joblib" in found and ParticleMassRegressor is not None:
+                reg_data = joblib.load(io.BytesIO(found["regressor.joblib"]))
+                reg = ParticleMassRegressor(model_type=reg_data.get("model_type", "gbr"), seed=reg_data.get("seed", 42))
+                reg.model = reg_data["model"]
+            bundle = {
+                "type": "gbr_particle_mass_regressor",
+                "classifier": clf,
+                "regressor": reg,
+                "labels": labels,
+                "calibration": calibration_info,
+            }
+
         _cache[identity] = bundle
         while len(_cache) > 2:
             _cache.popitem(last=False)
@@ -189,6 +223,7 @@ def predict(payload):
             raise ValueError("Unsupported image")
         rgb = image.convert("RGB").resize((p["width"], p["height"]), Image.Resampling.BILINEAR)
         array = np.array(rgb, dtype=np.float32, copy=True)
+        image_copy = rgb.copy()
 
     tensor = torch.from_numpy(array).permute(2, 0, 1) * p["scale"]
     tensor = (tensor - torch.tensor(p["mean"]).view(3, 1, 1)) / torch.tensor(p["std"]).view(3, 1, 1)
@@ -246,35 +281,68 @@ def predict(payload):
         materials = ["FEM", "NFM", "PCB", "PLA", "OTHER"]
         mass_kg = float(payload.get("mass_kg", 100.0))
         
-        # Canonical baseline priors from FutuRaM WEEE profiles
-        base_fractions = {"FEM": 0.4820, "NFM": 0.1240, "PCB": 0.0910, "PLA": 0.2810, "OTHER": 0.0220}
-        
-        # Vision-guided adjustment from shredded particle intake image
-        if array is not None:
-            # Color-space analysis: PCB exhibits high green relative to red/blue
-            # Ferrous/metallic particles exhibit higher overall gray reflectivity
-            mean_intensity = float(np.mean(array))
-            mean_green = float(np.mean(array[:, :, 1]))
-            mean_red = float(np.mean(array[:, :, 0]))
+        clf = bundle.get("classifier") if bundle else None
+        reg = bundle.get("regressor") if bundle else None
 
-            pcb_adj = 0.020 if mean_green > (mean_red * 1.05) else -0.010
-            fem_adj = 0.025 if mean_intensity > 130.0 else -0.015
+        if clf is not None and reg is not None and image_copy is not None and extract_particle_classifier_features is not None:
+            c_feat = extract_particle_classifier_features(image_copy)
+            c_vec = np.array([[
+                c_feat["area_px"], c_feat["bbox_area_px"], c_feat["aspect_ratio"], c_feat["fill_ratio"],
+                c_feat["fg_mean_r"], c_feat["fg_mean_g"], c_feat["fg_mean_b"],
+                c_feat["fg_std_r"], c_feat["fg_std_g"], c_feat["fg_std_b"],
+                c_feat["mean_r"], c_feat["mean_g"], c_feat["mean_b"],
+                c_feat["std_intensity"], c_feat["green_red_ratio"], c_feat["red_blue_ratio"]
+            ]], dtype=np.float64)
 
-            adjusted = {
-                "FEM": max(0.05, base_fractions["FEM"] + fem_adj),
-                "NFM": base_fractions["NFM"],
-                "PCB": max(0.02, base_fractions["PCB"] + pcb_adj),
-                "PLA": base_fractions["PLA"],
-                "OTHER": base_fractions["OTHER"],
-            }
-            tot_adj = sum(adjusted.values())
-            base_fractions = {k: adjusted[k] / tot_adj for k in materials}
+            pred_probs = clf.predict_proba(c_vec)[0]
+            class_est_mass = {}
+            for i, c in enumerate(clf.classes):
+                r_feat = extract_particle_features(image_copy, predicted_class=c)
+                r_vec = np.array([[
+                    r_feat["area_px"], r_feat["bbox_area_px"], r_feat["aspect_ratio"], r_feat["fill_ratio"],
+                    r_feat["mean_r"], r_feat["mean_g"], r_feat["mean_b"], r_feat["std_intensity"],
+                    r_feat["is_fem"], r_feat["is_nfm"], r_feat["is_pcb"], r_feat["is_pla"]
+                ]], dtype=np.float64)
+                m_g = float(reg.predict_mass_g(r_vec)[0])
+                class_est_mass[c] = float(pred_probs[i]) * m_g
+
+            tot_m = max(sum(class_est_mass.values()), 1e-6)
+            other_frac = 0.015
+            rem_frac = 1.0 - other_frac
+            base_fractions = {c: (class_est_mass[c] / tot_m) * rem_frac for c in clf.classes}
+            base_fractions["OTHER"] = other_frac
+            max_c = max(base_fractions.keys(), key=lambda k: base_fractions[k])
+            base_fractions[max_c] += 1.0 - sum(base_fractions.values())
+        else:
+            # Canonical baseline priors from FutuRaM WEEE profiles
+            base_fractions = {"FEM": 0.4820, "NFM": 0.1240, "PCB": 0.0910, "PLA": 0.2810, "OTHER": 0.0220}
+            if array is not None:
+                # Color-space analysis: PCB exhibits high green relative to red/blue
+                # Ferrous/metallic particles exhibit higher overall gray reflectivity
+                mean_intensity = float(np.mean(array))
+                mean_green = float(np.mean(array[:, :, 1]))
+                mean_red = float(np.mean(array[:, :, 0]))
+
+                pcb_adj = 0.020 if mean_green > (mean_red * 1.05) else -0.010
+                fem_adj = 0.025 if mean_intensity > 130.0 else -0.015
+
+                adjusted = {
+                    "FEM": max(0.05, base_fractions["FEM"] + fem_adj),
+                    "NFM": base_fractions["NFM"],
+                    "PCB": max(0.02, base_fractions["PCB"] + pcb_adj),
+                    "PLA": base_fractions["PLA"],
+                    "OTHER": base_fractions["OTHER"],
+                }
+                tot_adj = sum(adjusted.values())
+                base_fractions = {k: adjusted[k] / tot_adj for k in materials}
 
         material_mass = {k: round(base_fractions[k] * mass_kg, 4) for k in materials}
         
         # Scenario 0 must match normalized predicted masses strictly within 1e-6
         total_est_mass = sum(material_mass.values())
         scen_0 = {k: material_mass[k] / total_est_mass for k in materials}
+        max_k0 = max(scen_0.keys(), key=lambda k: scen_0[k])
+        scen_0[max_k0] += 1.0 - sum(scen_0.values())
         
         # Generate 3 aligned joint scenarios spanning expected process variance
         scen_1 = {
@@ -286,6 +354,8 @@ def predict(payload):
         }
         tot_1 = sum(scen_1.values())
         scen_1 = {k: scen_1[k] / tot_1 for k in materials}
+        max_k1 = max(scen_1.keys(), key=lambda k: scen_1[k])
+        scen_1[max_k1] += 1.0 - sum(scen_1.values())
 
         scen_2 = {
             "FEM": scen_0["FEM"] * 1.06,
@@ -296,6 +366,8 @@ def predict(payload):
         }
         tot_2 = sum(scen_2.values())
         scen_2 = {k: scen_2[k] / tot_2 for k in materials}
+        max_k2 = max(scen_2.keys(), key=lambda k: scen_2[k])
+        scen_2[max_k2] += 1.0 - sum(scen_2.values())
 
         scenarios = [scen_0, scen_1, scen_2]
 

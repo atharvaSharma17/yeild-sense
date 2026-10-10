@@ -99,28 +99,56 @@ Evaluated on the locked 91-image held-out test split:
 
 ---
 
-## 6. Assumptions & Scope Boundaries
+---
 
-1. **Intake Triage vs. Chemical Assay:** RGB images detect device categories and battery hazards from exterior visual features; they cannot measure internal precious metal purities or chemical compositions.
+## 6. Track A: Particle Composition & Physical Mass Regression
+
+For downstream post-shredder material separation streams, YieldSense provides a verified **Track A pipeline** trained on the official TU Darmstadt WEEE Particle Image and Mass Dataset (**RGB-MFCO v1.0.0**):
+
+### 6.1 Training & Feature Engineering (DS2 Paired Samples)
+* **1,976 paired particle images** from DS2 are matched to exact physical gram masses from calibrated high-precision laboratory scale time series (`Masses_DS2_Particles_extracted.csv`).
+* Morphological, color-space (RGB moments, green-to-red PCB ratios), and intensity features are extracted via [`ml/track_a/features.py`](track_a/features.py).
+* An Extra-Trees classifier (`ParticleMaterialClassifier`) identifies particle material (`FEM, NFM, PCB, PLA`) with **84.26% cross-validation accuracy** (Macro-F1: 0.8423).
+* A Gradient-Boosted Regressor (`ParticleMassRegressor`) estimates individual particle gram mass with **1.8552 g MAE** ($R^2 = 0.5629$).
+
+### 6.2 Zero-Shot Empirical Validation on Real Mixed Batches (DS3)
+The trained models were evaluated on **2,789 unlabelled physical particles** across three real heterogeneous mixed industrial batches (`MS1`, `MS2`, `MS3`), comparing predicted material fractions against ground-truth bulk weight fractions from `Masses_DS3_Fractions.csv`:
+
+| Mixed Batch | Particle Count | Scale Mass | Visual Est. Mass | Visual/Scale Ratio | True Composition (FEM / NFM / PCB / PLA) | Predicted Composition | Composition MAE |
+|---|---:|---:|---:|---:|---|---|---:|
+| **MS1** | 559 | 2.003 kg | 2.102 kg | 1.049x | 29.9% / 30.0% / 20.0% / 20.1% | 31.7% / 28.3% / 20.6% / 19.5% | **1.16%** |
+| **MS2** | 1,267 | 4.006 kg | 4.121 kg | 1.029x | 45.0% / 14.9% / 10.1% / 29.9% | 43.2% / 18.4% / 11.0% / 27.3% | **2.17%** |
+| **MS3** | 963 | 4.002 kg | 4.256 kg | 1.064x | 15.1% / 45.1% / 29.8% / 10.0% | 24.4% / 38.0% / 27.0% / 10.7% | **4.97%** |
+| **Mean** | **2,789** | — | — | **1.047x** | — | — | **2.76%** |
+
+* **Weighbridge Reconciliation:** Raw visual mass correlates within 2.9%–6.4% of actual weighbridge scale measurements across thousands of particles. [`reconcile_batch_composition()`](track_a/mass_regression.py) adjusts predictions to match scale tonnage while preserving visual material fractions.
+* **Go Contract Compliance:** Packaged manifest (`artifacts/track_a/registered_model_manifest.json`) satisfies 100% of the Go backend's `contract.go` requirements (`track: "A"`, 5 material labels including `OTHER`, non-empty `paired_mass_evidence`, and strict scenario 0 alignment within $10^{-6}$).
+
+---
+
+## 7. Assumptions & Scope Boundaries
+
+1. **Intake Triage vs. Chemical Assay:** RGB images detect device categories, battery hazards, and shredded particle categories from exterior visual features; they cannot measure internal precious metal purities or chemical alloy compositions.
 2. **Fail-Closed Safety:** Suspect or unknown battery lots are restricted from mechanical shredding routes and diverted exclusively to quarantine.
 3. **Scenario Alignment:** Scenario indices across batches represent shared joint macroeconomic/recovery outcomes.
 
 ---
 
-## 7. Serving Worker & Backend Contract
+## 8. Serving Worker & Backend Contract
 
 The serving worker in [`ml/serving/worker.py`](serving/worker.py) implements `POST /predict` on `http://127.0.0.1:9000` (or ECR sidecar):
 * Accepts Go backend requests containing authorization token, request ID, image bytes, and model manifest.
-* Supports `dualhead_efficientnet_b0` and `resnet18`.
+* Supports Track B (`dualhead_efficientnet_b0`, `resnet18`) and Track A (`gbr_particle_mass_regressor`).
 * Returns calibrated class probabilities summing strictly to 1.0 ($\pm 10^{-6}$), within the 256 KiB response budget.
 * Emits `battery_alert: "suspected"` when $p_{\text{bat}} \ge \hat{\tau}_{\text{bat}}$, triggering Go quarantine routing.
-* Supports Track A (`task: "particle_composition"`) returning normalized material masses and scenarios matching scenario 0.
+* Supports Track A (`task: "particle_composition"`) returning normalized material masses and scenarios matching scenario 0 within $10^{-6}$.
 
 ---
 
-## 8. Reproduction & Commands
+## 9. Reproduction & Commands
 
 ```powershell
+# --- TRACK B: Whole-Device Triage & Safety ---
 # 1. Generate splits & priors
 python scripts/split_xbat.py
 python scripts/transform_futuram.py
@@ -131,10 +159,18 @@ python ml/train.py --train_dir data/processed --val_dir data/processed --model_d
 # 3. Evaluate held-out test performance
 python ml/evaluate.py --model_dir artifacts --test_csv data/processed/test.csv
 
-# 4. Package model archive & Go-compliant manifest
+# 4. Package Track B model archive & Go manifest
 python scripts/package_model.py
 
-# 5. Run serving and contract integration tests
-python -m unittest ml/serving/test_dualhead_worker.py
-$env:PYTHONPATH="ml/serving"; python -m unittest ml/serving/test_worker.py
+# --- TRACK A: Particle Composition & Physical Mass Regression ---
+# 5. Train on DS2 (1,976 paired particles) & validate on DS3 (2,789 mixed particles)
+python ml/track_a/train.py --zip_path RGB-MFCO-dataset-v1.0.0.zip --output_dir artifacts/track_a
+
+# 6. Package Track A model archive & Go manifest
+python scripts/package_track_a.py
+
+# --- UNIT & CONTRACT TEST SUITE ---
+# 7. Run full serving worker test suite
+python -m unittest ml/serving/test_dualhead_worker.py ml/serving/test_worker.py ml/serving/test_track_a_worker.py
 ```
+
