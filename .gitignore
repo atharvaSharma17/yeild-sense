@@ -44,12 +44,15 @@ data/processed/validation/
 data/processed/test/
 data/processed/res_XBAT*
 
-# Model weights (store in S3 / release artifacts)
+# Model weights (store in S3 / release artifacts; whitelist evaluation archives)
 *.pth
 *.pt
 *.bin
 *.onnx
 *.joblib
+!artifacts/model.pth
+!artifacts/model.tar.gz
+!artifacts/track_a/model.tar.gz
 
 # OS & IDE
 .DS_Store
