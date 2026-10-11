@@ -58,7 +58,10 @@ export type ModelManifest = {
   artifact_sha256: string;
   dataset_manifest_sha256: string;
   data_version: string;
-  training_job_arn: string;
+  training_job_arn?: string;
+  training_source?: "local" | "sagemaker";
+  training_evidence?: string;
+  conformal_battery_threshold?: number;
   labels: string[];
   battery_review_labels?: string[];
   confidence_threshold: number;

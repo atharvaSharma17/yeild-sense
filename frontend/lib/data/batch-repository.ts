@@ -1,7 +1,7 @@
 "use client";
 
 import { mockBatches, mockImages } from "@/lib/data/mock-batches";
-import type { ApiProblem, Batch, BatchDraft, BatchImage, BatchListResponse, Composition, Prediction, PredictionResponse } from "@/types/batch";
+import type { ApiProblem, Batch, BatchDraft, BatchImage, BatchListResponse, Composition, Prediction, PredictionResponse, ModelManifest } from "@/types/batch";
 
 const STORAGE_KEY = "yieldsense.phase-two.batches";
 const IMAGE_STORAGE_KEY = "yieldsense.phase-two.images";
@@ -68,12 +68,24 @@ export const batchRepository = {
     return this.update({ ...current, composition });
   },
   async images(id: string): Promise<BatchImage[]> {
-    if (!useMockData) return [];
+    if (!useMockData) {
+      const images: BatchImage[] = [];
+      let cursor = "";
+      do {
+        const page = await request<{ items: BatchImage[]; next_cursor: string }>(`/v1/batches/${encodeURIComponent(id)}/images?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);
+        images.push(...page.items.map((image) => ({ ...image, preview_url: `/api/yieldsense/v1/images/${encodeURIComponent(image.id)}/content` })));
+        cursor = page.next_cursor;
+      } while (cursor);
+      return images.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }
     await wait(180);
     return getImages().filter((image) => image.batch_id === id);
   },
   async uploadImage(batchId: string, file: File): Promise<BatchImage> {
-    if (!useMockData) return request<BatchImage>(`/v1/batches/${batchId}/images`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+    if (!useMockData) {
+      const image = await request<BatchImage>(`/v1/batches/${batchId}/images`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+      return { ...image, preview_url: `/api/yieldsense/v1/images/${encodeURIComponent(image.id)}/content` };
+    }
     await wait(700);
     const item: BatchImage = { id: `img_${Math.random().toString(36).slice(2, 8)}`, batch_id: batchId, object_key: `raw/${batchId}/mock-upload.${file.type === "image/png" ? "png" : "jpg"}`, sha256: "local-preview-only", size_bytes: file.size, content_type: file.type as BatchImage["content_type"], created_at: new Date().toISOString(), preview_url: URL.createObjectURL(file) };
     saveImages([...getImages(), item]);
@@ -86,5 +98,20 @@ export const batchRepository = {
   async getPrediction(id: string): Promise<Prediction> {
     if (useMockData) throw new RepositoryError("No model evidence is available in demo mode.", 404);
     return request<Prediction>(`/v1/predictions/${id}`);
+  },
+  async models(): Promise<ModelManifest[]> {
+    if (useMockData) return [];
+    const models: ModelManifest[] = [];
+    let cursor = "";
+    do {
+      const page = await request<{ items: ModelManifest[]; next_cursor: string }>(`/v1/models?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);
+      models.push(...page.items);
+      cursor = page.next_cursor;
+    } while (cursor);
+    return models;
+  },
+  async predictComposition(batchId: string, imageId: string, version: number, modelVersion: string): Promise<PredictionResponse> {
+    if (useMockData) throw new RepositoryError("Model inference is unavailable in demo mode.", 503);
+    return request<PredictionResponse>("/v1/predict-composition", { method: "POST", headers: { "Content-Type": "application/json", "If-Match": String(version) }, body: JSON.stringify({ batch_id: batchId, image_id: imageId, model_version: modelVersion }) });
   },
 };

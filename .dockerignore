@@ -1,0 +1,11 @@
+.git
+artifacts
+data
+frontend
+backend
+**/__pycache__
+**/.env*
+**/node_modules
+**/*.pth
+**/*.tar.gz
+**/*.joblib

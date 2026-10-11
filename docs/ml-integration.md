@@ -42,7 +42,7 @@ The wrapper implements RGB conversion, bilinear resize, scaling and channel norm
 Build the CPU wrapper for linux/amd64, then tag/push it to the **same foundation ECR repository** as the API, under a unique tag. Obtain its digest using `aws ecr describe-images`. The execution role is intentionally scoped to that repository.
 
 ```powershell
-docker build --platform linux/amd64 -t yieldsense-inference ml/serving
+docker build --platform linux/amd64 -f ml/serving/Dockerfile -t yieldsense-inference .
 # Authenticate to ECR, tag/push the worker, then use its actual digest:
 ./infra/deploy.ps1 -MLWorkerDigest 'sha256:ACTUAL_64_HEX_DIGEST' -DefaultModelVersion xbat-classifier-v1
 ```

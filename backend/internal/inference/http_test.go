@@ -16,6 +16,33 @@ import (
 func model() Model {
 	return Model{Version: "xbat-v1", ContractVersion: "1", Track: "B", Task: DeviceTask, Architecture: "resnet18", ArtifactS3URI: "s3://bucket/models/v1/model.tar.gz", ArtifactSHA256: strings.Repeat("a", 64), DatasetManifestSHA256: strings.Repeat("b", 64), DataVersion: "xbat-reviewed-v1", TrainingJobARN: "arn:aws:sagemaker:ap-south-1:123456789012:training-job/xbat-v1", Labels: []string{"device-a", "device-b"}, Preprocessing: Preprocessing{Width: 224, Height: 224, ColorMode: "RGB", Scale: 1.0 / 255, Mean: []float64{.485, .456, .406}, Std: []float64{.229, .224, .225}}, ConfidenceThreshold: .7, Evaluation: map[string]float64{"macro_f1": .8}}
 }
+
+func TestLocalTrainingAndBatteryThresholdProvenance(t *testing.T) {
+	m := model()
+	m.TrainingSource = "local"
+	m.TrainingEvidence = "Training run log and held-out evaluation archived by ML developer"
+	m.TrainingJobARN = ""
+	threshold := .1744
+	m.ConformalBatteryThreshold = &threshold
+	if err := m.Validate("bucket"); err != nil {
+		t.Fatal(err)
+	}
+	m.TrainingJobARN = model().TrainingJobARN
+	if m.Validate("bucket") == nil {
+		t.Fatal("local training accepted a SageMaker claim")
+	}
+	m.TrainingJobARN = ""
+	m.TrainingEvidence = ""
+	if m.Validate("bucket") == nil {
+		t.Fatal("local training accepted without evidence")
+	}
+	m = model()
+	threshold = 1.1
+	m.ConformalBatteryThreshold = &threshold
+	if m.Validate("bucket") == nil {
+		t.Fatal("invalid battery threshold accepted")
+	}
+}
 func requestForTest() Request {
 	return Request{ContractVersion: "1", RequestID: "request", Model: model(), MassKG: 100, ImageBytes: []byte("test image bytes")}
 }

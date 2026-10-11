@@ -239,3 +239,46 @@ func TestImageValidation(t *testing.T) {
 		t.Fatal(rec.Code, rec.Body)
 	}
 }
+
+func TestUploadedImagesSurviveReloadAndKeepBatchScope(t *testing.T) {
+	_, h, _, objects := setup()
+	created := request(h, "POST", "/v1/batches", marshal(testBatch()), "")
+	var batch domain.Batch
+	if err := json.Unmarshal(created.Body.Bytes(), &batch); err != nil {
+		t.Fatal(err)
+	}
+	var data bytes.Buffer
+	if err := png.Encode(&data, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	upload := request(h, "POST", "/v1/batches/"+batch.ID+"/images", data.Bytes(), "")
+	var img struct {
+		ID        string `json:"id"`
+		ObjectKey string `json:"object_key"`
+	}
+	if upload.Code != 201 {
+		t.Fatal(upload.Code, upload.Body)
+	}
+	if err := json.Unmarshal(upload.Body.Bytes(), &img); err != nil {
+		t.Fatal(err)
+	}
+	listed := request(h, "GET", "/v1/batches/"+batch.ID+"/images", nil, "")
+	if listed.Code != 200 || !strings.Contains(listed.Body.String(), img.ID) {
+		t.Fatal(listed.Code, listed.Body)
+	}
+	other := request(h, "POST", "/v1/batches", marshal(testBatch()), "")
+	var second domain.Batch
+	_ = json.Unmarshal(other.Body.Bytes(), &second)
+	listed = request(h, "GET", "/v1/batches/"+second.ID+"/images", nil, "")
+	if listed.Code != 200 || strings.Contains(listed.Body.String(), img.ID) {
+		t.Fatal("image leaked to another batch", listed.Body)
+	}
+	content := request(h, "GET", "/v1/images/"+img.ID+"/content", nil, "")
+	if content.Code != 200 || !bytes.Equal(content.Body.Bytes(), data.Bytes()) || content.Header().Get("Content-Type") != "image/png" {
+		t.Fatal(content.Code, content.Body)
+	}
+	objects.data[img.ObjectKey] = []byte("corrupted")
+	if got := request(h, "GET", "/v1/images/"+img.ID+"/content", nil, ""); got.Code != 500 {
+		t.Fatal("corrupted image served", got.Code)
+	}
+}

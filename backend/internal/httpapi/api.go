@@ -149,7 +149,9 @@ func (a *API) Echo() *echo.Echo {
 	v.PUT("/batches/:id", a.updateBatch)
 	v.POST("/composition", a.composition)
 	v.POST("/batches/:id/images", a.image)
+	v.GET("/batches/:id/images", a.batchImages)
 	v.GET("/images/:id", a.get("images"))
+	v.GET("/images/:id/content", a.imageContent)
 	v.POST("/models", a.registerModel)
 	v.GET("/models", a.list("models"))
 	v.GET("/models/:id", a.get("models"))
@@ -371,7 +373,10 @@ func (a *API) image(c *echo.Context) error {
 		return err
 	}
 	v := map[string]any{"id": id, "batch_id": b.ID, "object_key": key, "sha256": hex.EncodeToString(sum[:]), "size_bytes": len(data), "content_type": mime, "created_at": now()}
-	if err := a.Records.Save(ctx, "images", id, 0, v); err != nil {
+	if err := a.Records.SaveAll(ctx, []storage.Write{
+		{Kind: "images", ID: id, Expected: 0, Value: v},
+		{Kind: "batch_images:" + b.ID, ID: id, Expected: 0, Value: v},
+	}); err != nil {
 		return err
 	}
 	return c.JSON(201, v)

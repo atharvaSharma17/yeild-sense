@@ -9,6 +9,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     return NextResponse.json({ error: "YieldSense API proxy is not configured." }, { status: 503 });
   }
 
+  if (path[0] !== "v1" || path.some((segment) => !/^[a-zA-Z0-9._-]+$/.test(segment) || segment === "." || segment === "..")) {
+    return NextResponse.json({ error: "Invalid API path." }, { status: 400 });
+  }
+  const origin = request.headers.get("origin");
+  if (request.method !== "GET" && origin && origin !== request.nextUrl.origin) {
+    return NextResponse.json({ error: "Cross-origin writes are not permitted." }, { status: 403 });
+  }
+
   const target = new URL(`${path.join("/")}${request.nextUrl.search}`, `${baseUrl.replace(/\/$/, "")}/`);
   const headers = new Headers();
   headers.set("Authorization", `Bearer ${apiKey}`);
@@ -19,12 +27,22 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
 
   const method = request.method;
-  const response = await fetch(target, {
+  let response: Response;
+  try {
+    response = await fetch(target, {
     method,
     headers,
     body: method === "GET" ? undefined : await request.arrayBuffer(),
     cache: "no-store",
-  });
+    redirect: "manual",
+    signal: AbortSignal.timeout(30_000),
+    });
+  } catch {
+    return NextResponse.json({ error: "The backend could not be reached. Try again shortly." }, { status: 503 });
+  }
+  if (response.status >= 300 && response.status < 400) {
+    return NextResponse.json({ error: "Unexpected backend redirect." }, { status: 502 });
+  }
 
   const responseHeaders = new Headers();
   for (const name of ["content-type", "etag", "x-request-id"]) {

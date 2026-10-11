@@ -27,6 +27,33 @@ type Prediction struct {
 	HumanReviewRequired bool                 `json:"human_review_required"`
 }
 
+func (a *API) batchImages(c *echo.Context) error {
+	var batch domain.Batch
+	if err := a.Records.Get(c.Request().Context(), "batches", c.Param("id"), &batch); err != nil {
+		return err
+	}
+	return a.list("batch_images:" + batch.ID)(c)
+}
+
+func (a *API) imageContent(c *echo.Context) error {
+	var img inference.Image
+	ctx := c.Request().Context()
+	if err := a.Records.Get(ctx, "images", c.Param("id"), &img); err != nil {
+		return err
+	}
+	data, err := a.Objects.Get(ctx, img.ObjectKey)
+	if err != nil {
+		return err
+	}
+	sum := sha256.Sum256(data)
+	if len(data) != img.SizeBytes || hex.EncodeToString(sum[:]) != img.SHA256 {
+		return errors.New("stored image integrity mismatch")
+	}
+	c.Response().Header().Set("Cache-Control", "private, no-store")
+	c.Response().Header().Set("X-Content-Type-Options", "nosniff")
+	return c.Blob(http.StatusOK, img.ContentType, data)
+}
+
 func (a *API) registerModel(c *echo.Context) error {
 	var m inference.Model
 	if err := decode(c, &m); err != nil {

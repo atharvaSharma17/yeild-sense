@@ -10,6 +10,7 @@ param(
     [ValidateRange(1,10)]
     [int]$MaxTasks = 2,
     [switch]$UseTemporaryDockerConfig,
+    [switch]$BuildMLWorker,
     [ValidatePattern('^$|^sha256:[a-f0-9]{64}$')]
     [string]$MLWorkerDigest = '',
     [string]$MLInferenceURL = '',
@@ -19,6 +20,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if ($MLWorkerDigest -and $MLInferenceURL) { throw 'Choose MLWorkerDigest or MLInferenceURL, not both.' }
+if ($BuildMLWorker -and ($MLWorkerDigest -or $MLInferenceURL)) { throw 'BuildMLWorker cannot be combined with another worker destination.' }
 foreach ($tool in @('aws', 'docker')) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "Install $tool before deploying." }
 }
@@ -58,6 +60,13 @@ $repository = [string]$outputs['RepositoryUri']
 $registry = $repository.Split('/')[0]
 $tag = 'deploy-' + [DateTime]::UtcNow.ToString('yyyyMMddHHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8)
 $image = "${repository}:$tag"
+$workerTag = "$tag-ml"
+$workerImage = "${repository}:$workerTag"
+$projectRoot = Split-Path $PSScriptRoot -Parent
+if ($BuildMLWorker) {
+    Write-Host 'Building the CPU ML worker with both model architectures...'
+    Invoke-Docker -Arguments @('build', '--platform', 'linux/amd64', '-f', (Join-Path $projectRoot 'ml/serving/Dockerfile'), '-t', $workerImage, $projectRoot) | Out-Host
+}
 
 Write-Host 'Building and pushing the linux/amd64 backend image...'
 if ($UseTemporaryDockerConfig) {
@@ -85,6 +94,7 @@ if ($UseTemporaryDockerConfig) {
         # absent from the temporary directory.
         $env:DOCKER_CONTEXT = $null
         Invoke-Docker -Arguments @('--config', $temporaryDockerConfig, '--host', $dockerEndpoint, 'push', $image) | Out-Host
+        if ($BuildMLWorker) { Invoke-Docker -Arguments @('--config', $temporaryDockerConfig, '--host', $dockerEndpoint, 'push', $workerImage) | Out-Host }
     } finally {
         $env:DOCKER_CONTEXT = $previousDockerContext
         $password = $null
@@ -102,10 +112,15 @@ if ($UseTemporaryDockerConfig) {
     } finally { $password = $null }
     Invoke-Docker -Arguments @('build', '--platform', 'linux/amd64', '-t', $image, $backend) | Out-Host
     Invoke-Docker -Arguments @('push', $image) | Out-Host
+    if ($BuildMLWorker) { Invoke-Docker -Arguments @('push', $workerImage) | Out-Host }
 }
 $digest = (Invoke-Aws -Arguments @('ecr', 'describe-images', '--repository-name', [string]$outputs['RepositoryName'],
     '--image-ids', "imageTag=$tag", '--query', 'imageDetails[0].imageDigest', '--output', 'text')).Trim()
 if ($digest -notmatch '^sha256:[a-f0-9]{64}$') { throw 'Could not resolve the uploaded image digest.' }
+if ($BuildMLWorker) {
+    $MLWorkerDigest = (Invoke-Aws -Arguments @('ecr', 'describe-images', '--repository-name', [string]$outputs['RepositoryName'], '--image-ids', "imageTag=$workerTag", '--query', 'imageDetails[0].imageDigest', '--output', 'text')).Trim()
+    if ($MLWorkerDigest -notmatch '^sha256:[a-f0-9]{64}$') { throw 'Could not resolve the uploaded ML image digest.' }
+}
 
 Write-Host 'Deploying the Go API with managed HTTPS ingress...'
 Invoke-Aws -Arguments @('cloudformation', 'deploy', '--template-file', $serviceTemplate,

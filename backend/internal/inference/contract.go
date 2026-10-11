@@ -31,27 +31,33 @@ type Preprocessing struct {
 
 // Model is immutable metadata supplied by the ML pipeline, not a training job.
 type Model struct {
-	Version               string             `json:"model_version"`
-	CreatedAt             string             `json:"created_at,omitempty"`
-	ContractVersion       string             `json:"contract_version"`
-	Track                 string             `json:"track"`
-	Task                  string             `json:"task"`
-	Architecture          string             `json:"architecture"`
-	ArtifactS3URI         string             `json:"artifact_s3_uri"`
-	ArtifactSHA256        string             `json:"artifact_sha256"`
-	DatasetManifestSHA256 string             `json:"dataset_manifest_sha256"`
-	DataVersion           string             `json:"data_version"`
-	TrainingJobARN        string             `json:"training_job_arn"`
-	Labels                []string           `json:"labels"`
-	BatteryReviewLabels   []string           `json:"battery_review_labels,omitempty"`
-	Preprocessing         Preprocessing      `json:"preprocessing"`
-	ConfidenceThreshold   float64            `json:"confidence_threshold"`
-	Evaluation            map[string]float64 `json:"evaluation"`
-	PairedMassEvidence    string             `json:"paired_mass_evidence,omitempty"`
+	Version                   string             `json:"model_version"`
+	CreatedAt                 string             `json:"created_at,omitempty"`
+	ContractVersion           string             `json:"contract_version"`
+	Track                     string             `json:"track"`
+	Task                      string             `json:"task"`
+	Architecture              string             `json:"architecture"`
+	ArtifactS3URI             string             `json:"artifact_s3_uri"`
+	ArtifactSHA256            string             `json:"artifact_sha256"`
+	DatasetManifestSHA256     string             `json:"dataset_manifest_sha256"`
+	DataVersion               string             `json:"data_version"`
+	TrainingJobARN            string             `json:"training_job_arn,omitempty"`
+	TrainingSource            string             `json:"training_source,omitempty"`
+	TrainingEvidence          string             `json:"training_evidence,omitempty"`
+	Labels                    []string           `json:"labels"`
+	BatteryReviewLabels       []string           `json:"battery_review_labels,omitempty"`
+	Preprocessing             Preprocessing      `json:"preprocessing"`
+	ConfidenceThreshold       float64            `json:"confidence_threshold"`
+	ConformalBatteryThreshold *float64           `json:"conformal_battery_threshold,omitempty"`
+	Evaluation                map[string]float64 `json:"evaluation"`
+	PairedMassEvidence        string             `json:"paired_mass_evidence,omitempty"`
 }
 
 func finite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }
 func (m Model) Validate(bucket string) error {
+	if m.ConformalBatteryThreshold != nil && (m.Track != "B" || !finite(*m.ConformalBatteryThreshold) || *m.ConformalBatteryThreshold < 0 || *m.ConformalBatteryThreshold > 1) {
+		return errors.New("conformal_battery_threshold requires Track B and a value in [0,1]")
+	}
 	if !versionPattern.MatchString(m.Version) || m.ContractVersion != ContractVersion {
 		return errors.New("valid model_version and contract_version=1 required")
 	}
@@ -62,8 +68,15 @@ func (m Model) Validate(bucket string) error {
 	if err != nil || u.Scheme != "s3" || u.Host != bucket || !(strings.HasPrefix(u.Path, "/models/") || strings.HasPrefix(u.Path, "/model-artifacts/")) || strings.HasSuffix(u.Path, "/") || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
 		return errors.New("artifact_s3_uri must reference this bucket's models/ or model-artifacts/ prefix")
 	}
-	if !hashPattern.MatchString(m.ArtifactSHA256) || !hashPattern.MatchString(m.DatasetManifestSHA256) || !jobPattern.MatchString(m.TrainingJobARN) || m.DataVersion == "" || m.Architecture == "" {
-		return errors.New("artifact/dataset hashes, training_job_arn, data_version and architecture required")
+	if !hashPattern.MatchString(m.ArtifactSHA256) || !hashPattern.MatchString(m.DatasetManifestSHA256) || m.DataVersion == "" || m.Architecture == "" {
+		return errors.New("artifact/dataset hashes, data_version and architecture required")
+	}
+	if m.TrainingSource == "local" {
+		if m.TrainingJobARN != "" || strings.TrimSpace(m.TrainingEvidence) == "" || len(m.TrainingEvidence) > 4096 {
+			return errors.New("local training requires training_evidence and no training_job_arn")
+		}
+	} else if (m.TrainingSource != "" && m.TrainingSource != "sagemaker") || !jobPattern.MatchString(m.TrainingJobARN) {
+		return errors.New("SageMaker training requires training_job_arn; local training requires explicit provenance")
 	}
 	if !finite(m.ConfidenceThreshold) || m.ConfidenceThreshold < 0 || m.ConfidenceThreshold > 1 {
 		return errors.New("confidence_threshold must be 0-1")

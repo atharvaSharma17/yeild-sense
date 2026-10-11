@@ -314,27 +314,7 @@ def predict(payload):
             max_c = max(base_fractions.keys(), key=lambda k: base_fractions[k])
             base_fractions[max_c] += 1.0 - sum(base_fractions.values())
         else:
-            # Canonical baseline priors from FutuRaM WEEE profiles
-            base_fractions = {"FEM": 0.4820, "NFM": 0.1240, "PCB": 0.0910, "PLA": 0.2810, "OTHER": 0.0220}
-            if array is not None:
-                # Color-space analysis: PCB exhibits high green relative to red/blue
-                # Ferrous/metallic particles exhibit higher overall gray reflectivity
-                mean_intensity = float(np.mean(array))
-                mean_green = float(np.mean(array[:, :, 1]))
-                mean_red = float(np.mean(array[:, :, 0]))
-
-                pcb_adj = 0.020 if mean_green > (mean_red * 1.05) else -0.010
-                fem_adj = 0.025 if mean_intensity > 130.0 else -0.015
-
-                adjusted = {
-                    "FEM": max(0.05, base_fractions["FEM"] + fem_adj),
-                    "NFM": base_fractions["NFM"],
-                    "PCB": max(0.02, base_fractions["PCB"] + pcb_adj),
-                    "PLA": base_fractions["PLA"],
-                    "OTHER": base_fractions["OTHER"],
-                }
-                tot_adj = sum(adjusted.values())
-                base_fractions = {k: adjusted[k] / tot_adj for k in materials}
+            raise ValueError('Track A requires trained classifier and mass regressor artifacts')
 
         material_mass = {k: round(base_fractions[k] * mass_kg, 4) for k in materials}
         
