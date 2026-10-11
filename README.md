@@ -67,8 +67,6 @@ The backend and ML worker run together on **ECS/Fargate in ap-south-1**. Cloudfl
 | VPC and gateway endpoints | Application networking and gateway access to S3/DynamoDB |
 | CloudFormation | Storage and service infrastructure defined in `infra/` |
 
-**SageMaker is not provisioned by the current deployment.** Locally trained artifacts are served by the ECS worker. The original design proposed SageMaker training and hosting; that remains a separate implementation path.
-
 ## Deploy and run
 
 From the repository root, with Docker running and the AWS profile authenticated:
