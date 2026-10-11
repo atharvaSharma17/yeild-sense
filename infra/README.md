@@ -38,7 +38,7 @@ Two stacks avoid the first-deployment dependency between creating the ECR reposi
 
 If Docker ECR login fails with a Windows credential-helper error such as `The stub received bad data`, rerun the same deployment with `-UseTemporaryDockerConfig`. This builds with your normal Docker configuration, then pushes through the same local engine using an isolated configuration containing the temporary ECR token. The credential file is removed in `finally`, including on push failure; your existing Docker credentials are unchanged. The workaround supports local Docker Desktop/Engine sockets. Rerunning with the same stack prefix and table name updates the existing foundation.
 
-To deploy CPU inference alongside Go, push the ML worker image to the foundation ECR repository, then pass `-MLWorkerDigest <sha256:digest> -DefaultModelVersion <version>` to `deploy.ps1`. Alternatively pass `-MLInferenceURL <url>` for a separately hosted worker. The service now uses an explicit Fargate task definition with the required `Main` application container and optional inference sidecar. Models are registered through `/v1/models`; see [the complete ML handoff](../docs/ml-integration.md).
+To deploy CPU inference alongside Go, push the ML worker image to the foundation ECR repository, then pass `-MLWorkerDigest <sha256:digest> -DefaultModelVersion <version>` to `deploy.ps1`. Alternatively pass `-MLInferenceURL <url>` for a separately hosted worker. The service now uses an explicit Fargate task definition with the required `Main` application container and optional inference sidecar. Models are registered through `/v1/models`; see [the complete ML handoff](../docs/full-stack-integration.md).
 
 The worker receives the generated secret as `ML_INFERENCE_TOKEN`, and the task role has read access to `models/` and `model-artifacts/`. This does not grant model upload permissions or create a training job. The inference worker's loopback port is not exposed publicly; a remote worker must authenticate the same generated secret.
 
@@ -51,7 +51,7 @@ $env:API_KEY = aws secretsmanager get-secret-value --secret-id $secretArn --regi
 $endpoint = aws cloudformation describe-stacks --stack-name yieldsense-service --region $region --query "Stacks[0].Outputs[?OutputKey=='Endpoint'].OutputValue | [0]" --output text
 if (-not $endpoint.StartsWith('https://')) { $endpoint = "https://$endpoint" }
 Invoke-RestMethod "$endpoint/health"
-./scripts/demo-backend.ps1 -BaseUrl $endpoint
+Invoke-RestMethod "$endpoint/v1/batches" -Headers @{ Authorization = "Bearer $env:API_KEY" }
 ```
 
 The caller retrieving the key needs `secretsmanager:GetSecretValue`; the public frontend should call through a trusted server proxy, keeping the shared key out of browser bundles. Secret rotation requires fresh ECS tasks to load the new value; use an ECS force deployment after changing the secret.
@@ -59,8 +59,6 @@ The caller retrieving the key needs `secretsmanager:GetSecretValue`; the public 
 Logs go to the service stack's `LogGroup` output and expire after 14 days. `Endpoint` is the managed HTTPS URL; `ServiceArn` identifies the deployed service. CORS defaults to disabled; configure only the actual frontend origins, comma-separated.
 
 ## Remove compute
-
-For a failed initial Express Mode deployment in `ROLLBACK_FAILED` where CloudFormation removed the infrastructure role but left the service active, run `./infra/restore-failed-service-role.ps1 -StackName yieldsense-dev-service -Profile yieldsense-dev -Region ap-south-1`. It derives the original role and service identifiers from the failed stack, restores the managed Express policy plus the supplemental operations in `service.yaml`, and creates the ELB/autoscaling service-linked roles only if absent. It does not delete resources. After IAM propagation, delete the failed Express service with `aws ecs delete-express-gateway-service --service-arn <printed-arn> --profile yieldsense-dev --region ap-south-1 --monitor-resources RESOURCE --monitor-mode TEXT-ONLY`. Once that service and its managed infrastructure are removed, delete the failed service stack and wait for stack deletion. Remove the manually restored infrastructure role (detach the managed policy, delete its `ExpressDeploymentOperations` inline policy, then delete the role); do not remove the shared service-linked roles. Keep the storage stack and rerun deployment. If AWS again returns an unspecified `CreateLoadBalancer` AccessDenied, investigate the account restriction with AWS Support rather than granting broad IAM permissions.
 
 Delete the service stack first; it imports the storage stack's exports:
 

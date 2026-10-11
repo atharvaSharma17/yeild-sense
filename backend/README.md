@@ -2,7 +2,7 @@
 
 Go 1.26.1, Echo v5, AWS SDK v2. Runtime persistence uses **only DynamoDB and S3**. The public API and optimizer run in Go. Optional CPU image inference uses the supplied PyTorch serving wrapper or a compatible HTTP worker.
 
-See the [ML integration handoff](../docs/ml-integration.md) for registering artifacts, connecting inference and deploying the worker. Training remains the ML developer's responsibility.
+See the [ML integration handoff](../docs/full-stack-integration.md) for registering artifacts, connecting inference and deploying the worker. Training remains the ML developer's responsibility.
 
 ## Setup
 
@@ -58,12 +58,6 @@ JSON endpoints require `Content-Type: application/json`. Lists return `{items, n
 | GET | `/v1/runs/:id`, `/v1/reports/:id` | Full JSON audit report |
 
 Batch creation always sets battery state `unknown` and review status `pending`. A subsequent versioned update records human inspection evidence. Sources for mass are `scale` or `illustrative`. Composition sources are `measured`, `category_prior`, `operator_entered`, or `model` (the latter also requires `model_version`). Every composition requires evidence and 1-20 scenarios with **all five** material fractions `FEM`, `NFM`, `PCB`, `PLA`, `OTHER`, nonnegative and summing to one.
-
-Run the complete example against a running server:
-
-```powershell
-../scripts/demo-backend.ps1
-```
 
 Optimize request:
 
